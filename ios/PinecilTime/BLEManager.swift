@@ -29,12 +29,13 @@ class BLEManager: NSObject {
     private var discoveredCharacteristics: [CBUUID: CBCharacteristic] = [:]
     private var pollTimer: Timer?
     private var scanTimer: Timer?
+    private let bleQueue = DispatchQueue(label: "com.pineciltime.ble", qos: .userInitiated)
 
     // MARK: - Init
 
     override init() {
         super.init()
-        centralManager = CBCentralManager(delegate: self, queue: .main)
+        centralManager = CBCentralManager(delegate: self, queue: bleQueue)
     }
 
     // MARK: - Connection State
@@ -48,6 +49,10 @@ class BLEManager: NSObject {
 
         var isConnected: Bool {
             self == .connected
+        }
+
+        var isConnecting: Bool {
+            self == .connecting
         }
     }
 
@@ -112,7 +117,22 @@ class BLEManager: NSObject {
         }
 
         let value = UInt16(temp).data
-        peripheral.writeValue(value, for: characteristic, type: .withResponse)
+        peripheral.writeValue(value, for: characteristic, type: .withoutResponse)
+    }
+
+    func setSlowPolling() {
+        pollTimer?.invalidate()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            self?.readBulkData()
+        }
+    }
+
+    func setFastPolling() {
+        guard connectionState == .connected else { return }
+        pollTimer?.invalidate()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.readBulkData()
+        }
     }
 
     // MARK: - Polling
@@ -157,35 +177,37 @@ class BLEManager: NSObject {
     private func handleCharacteristicValue(_ characteristic: CBCharacteristic) {
         guard let value = characteristic.value else { return }
 
-        switch characteristic.uuid {
-        case IronOSUUIDs.bulkLiveData:
-            liveData.updateFromBulkData(value)
-            recordTemperature()
+        DispatchQueue.main.async { [self] in
+            switch characteristic.uuid {
+            case IronOSUUIDs.bulkLiveData:
+                liveData.updateFromBulkData(value)
+                recordTemperature()
 
-        case IronOSUUIDs.liveTemp:
-            liveData.liveTemp = value.toUInt32() ?? 0
-        case IronOSUUIDs.setpointRead:
-            liveData.setpoint = value.toUInt32() ?? 0
-        case IronOSUUIDs.dcInput:
-            liveData.dcInput = value.toUInt32() ?? 0
-        case IronOSUUIDs.handleTemp:
-            liveData.handleTemp = value.toUInt32() ?? 0
-        case IronOSUUIDs.powerLevel:
-            liveData.powerLevel = value.toUInt32() ?? 0
-        case IronOSUUIDs.powerSource:
-            liveData.powerSource = value.toUInt32() ?? 0
-        case IronOSUUIDs.operatingMode:
-            liveData.operatingMode = value.toUInt32() ?? 0
-        case IronOSUUIDs.estimatedWatts:
-            liveData.estimatedWatts = value.toUInt32() ?? 0
-        case IronOSUUIDs.maxTemp:
-            liveData.maxTemp = value.toUInt32() ?? 450
+            case IronOSUUIDs.liveTemp:
+                liveData.liveTemp = value.toUInt32() ?? 0
+            case IronOSUUIDs.setpointRead:
+                liveData.setpoint = value.toUInt32() ?? 0
+            case IronOSUUIDs.dcInput:
+                liveData.dcInput = value.toUInt32() ?? 0
+            case IronOSUUIDs.handleTemp:
+                liveData.handleTemp = value.toUInt32() ?? 0
+            case IronOSUUIDs.powerLevel:
+                liveData.powerLevel = value.toUInt32() ?? 0
+            case IronOSUUIDs.powerSource:
+                liveData.powerSource = value.toUInt32() ?? 0
+            case IronOSUUIDs.operatingMode:
+                liveData.operatingMode = value.toUInt32() ?? 0
+            case IronOSUUIDs.estimatedWatts:
+                liveData.estimatedWatts = value.toUInt32() ?? 0
+            case IronOSUUIDs.maxTemp:
+                liveData.maxTemp = value.toUInt32() ?? 450
 
-        case IronOSUUIDs.firmwareVersion:
-            firmwareVersion = value.toString() ?? ""
+            case IronOSUUIDs.firmwareVersion:
+                firmwareVersion = value.toString() ?? ""
 
-        default:
-            break
+            default:
+                break
+            }
         }
     }
 }
@@ -195,17 +217,19 @@ class BLEManager: NSObject {
 extension BLEManager: CBCentralManagerDelegate {
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        switch central.state {
-        case .poweredOn:
-            startScanning()
-        case .poweredOff:
-            connectionState = .error("Bluetooth is off")
-        case .unauthorized:
-            connectionState = .error("Bluetooth access denied")
-        case .unsupported:
-            connectionState = .error("Bluetooth not supported")
-        default:
-            break
+        DispatchQueue.main.async { [self] in
+            switch central.state {
+            case .poweredOn:
+                startScanning()
+            case .poweredOff:
+                connectionState = .error("Bluetooth is off")
+            case .unauthorized:
+                connectionState = .error("Bluetooth access denied")
+            case .unsupported:
+                connectionState = .error("Bluetooth not supported")
+            default:
+                break
+            }
         }
     }
 
@@ -213,40 +237,48 @@ extension BLEManager: CBCentralManagerDelegate {
                         didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any],
                         rssi RSSI: NSNumber) {
-        // Auto-connect to first discovered Pinecil
-        if connectedPeripheral == nil {
-            if peripheral.name?.hasPrefix("PrattlePin-") == true ||
-               advertisementData[CBAdvertisementDataServiceUUIDsKey] != nil {
-                connect(to: peripheral)
-                return
+        DispatchQueue.main.async { [self] in
+            // Auto-connect to first discovered Pinecil
+            if connectedPeripheral == nil {
+                if peripheral.name?.hasPrefix("PrattlePin-") == true ||
+                   advertisementData[CBAdvertisementDataServiceUUIDsKey] != nil {
+                    connect(to: peripheral)
+                    return
+                }
             }
-        }
 
-        if !discoveredDevices.contains(where: { $0.identifier == peripheral.identifier }) {
-            discoveredDevices.append(peripheral)
+            if !discoveredDevices.contains(where: { $0.identifier == peripheral.identifier }) {
+                discoveredDevices.append(peripheral)
+            }
         }
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        connectionState = .connected
-        deviceName = peripheral.name ?? "Pinecil"
+        DispatchQueue.main.async { [self] in
+            connectionState = .connected
+            deviceName = peripheral.name ?? "Pinecil"
+        }
         peripheral.discoverServices(nil)
     }
 
     func centralManager(_ central: CBCentralManager,
                         didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
-        connectionState = .error(error?.localizedDescription ?? "Connection failed")
-        connectedPeripheral = nil
+        DispatchQueue.main.async { [self] in
+            connectionState = .error(error?.localizedDescription ?? "Connection failed")
+            connectedPeripheral = nil
+        }
     }
 
     func centralManager(_ central: CBCentralManager,
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
-        stopPolling()
-        connectionState = .disconnected
-        connectedPeripheral = nil
-        discoveredCharacteristics.removeAll()
+        DispatchQueue.main.async { [self] in
+            stopPolling()
+            connectionState = .disconnected
+            connectedPeripheral = nil
+            discoveredCharacteristics.removeAll()
+        }
     }
 }
 
@@ -284,7 +316,9 @@ extension BLEManager: CBPeripheralDelegate {
 
         // Start polling once we have the live data service
         if service.uuid == IronOSUUIDs.liveDataService || service.uuid == IronOSUUIDs.bulkDataService {
-            startPolling()
+            DispatchQueue.main.async { [self] in
+                startPolling()
+            }
         }
     }
 

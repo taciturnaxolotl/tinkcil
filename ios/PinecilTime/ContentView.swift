@@ -22,7 +22,7 @@ struct ContentView: View {
             if !bleManager.temperatureHistory.isEmpty {
                 TemperatureGraph(
                     history: bleManager.temperatureHistory,
-                    maxTemp: bleManager.liveData.maxTemp
+                    currentSetpoint: Int(targetTemp)
                 )
                 .padding(.horizontal, 20)
                 .padding(.vertical, 120)
@@ -150,9 +150,12 @@ struct ContentView: View {
                 step: 5,
                 onEditingChanged: { editing in
                     isEditingSlider = editing
-                    if !editing {
+                    if editing {
+                        bleManager.setSlowPolling()
+                    } else {
                         bleManager.setTemperature(UInt32(targetTemp))
                         lastSentTemp = targetTemp
+                        bleManager.setFastPolling()
                     }
                 }
             )
@@ -160,7 +163,7 @@ struct ContentView: View {
             .onChange(of: targetTemp) { _, newValue in
                 guard isEditingSlider else { return }
                 let now = Date()
-                if now.timeIntervalSince(lastSendTime) > 0.15 && abs(newValue - lastSentTemp) >= 5 {
+                if now.timeIntervalSince(lastSendTime) > 0.2 && abs(newValue - lastSentTemp) >= 5 {
                     bleManager.setTemperature(UInt32(newValue))
                     lastSentTemp = newValue
                     lastSendTime = now
@@ -220,12 +223,12 @@ struct ContentView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 20) {
-                if bleManager.isScanning || bleManager.connectionState == BLEManager.ConnectionState.connecting {
+                if bleManager.isScanning || bleManager.connectionState.isConnecting {
                     ProgressView()
                         .scaleEffect(1.2)
                         .padding(.bottom, 4)
 
-                    Text(bleManager.connectionState == BLEManager.ConnectionState.connecting ? "Connecting..." : "Scanning...")
+                    Text(bleManager.connectionState.isConnecting ? "Connecting..." : "Scanning...")
                         .font(.headline)
 
                     Text("Looking for your Pinecil")
