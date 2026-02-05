@@ -28,6 +28,7 @@ class BLEManager: NSObject {
     private var centralManager: CBCentralManager!
     private var discoveredCharacteristics: [CBUUID: CBCharacteristic] = [:]
     private var pollTimer: Timer?
+    private var scanTimer: Timer?
 
     // MARK: - Init
 
@@ -55,6 +56,7 @@ class BLEManager: NSObject {
     func startScanning() {
         guard centralManager.state == .poweredOn else { return }
 
+        scanTimer?.invalidate()
         discoveredDevices.removeAll()
         connectionState = .scanning
 
@@ -64,9 +66,16 @@ class BLEManager: NSObject {
         )
 
         isScanning = true
+
+        // Timeout after 10 seconds
+        scanTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
+            self?.stopScanning()
+        }
     }
 
     func stopScanning() {
+        scanTimer?.invalidate()
+        scanTimer = nil
         centralManager.stopScan()
         isScanning = false
         if connectionState == .scanning {
@@ -229,10 +238,6 @@ extension BLEManager: CBCentralManagerDelegate {
                         error: Error?) {
         connectionState = .error(error?.localizedDescription ?? "Connection failed")
         connectedPeripheral = nil
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            self?.startScanning()
-        }
     }
 
     func centralManager(_ central: CBCentralManager,
@@ -242,10 +247,6 @@ extension BLEManager: CBCentralManagerDelegate {
         connectionState = .disconnected
         connectedPeripheral = nil
         discoveredCharacteristics.removeAll()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            self?.startScanning()
-        }
     }
 }
 

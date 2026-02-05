@@ -207,34 +207,40 @@ struct ContentView: View {
     // MARK: - Scanning View
 
     private var scanningView: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
 
-            if bleManager.isScanning || bleManager.connectionState == .connecting {
-                ProgressView()
-                    .scaleEffect(1.5)
+            VStack(spacing: 20) {
+                if bleManager.isScanning || bleManager.connectionState == .connecting {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .padding(.bottom, 4)
 
-                Text(bleManager.connectionState == .connecting ? "Connecting..." : "Scanning...")
-                    .font(.headline)
+                    Text(bleManager.connectionState == .connecting ? "Connecting..." : "Scanning...")
+                        .font(.headline)
 
-                Text("Looking for your Pinecil")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
+                    Text("Looking for your Pinecil")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 4)
 
-                Text("No Device Found")
-                    .font(.headline)
+                    Text("No Device Found")
+                        .font(.headline)
 
-                Button("Scan Again") {
-                    bleManager.startScanning()
+                    Button("Scan Again") {
+                        bleManager.startScanning()
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
             }
-
-            Spacer()
+            .padding(32)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+            .shadow(color: .black.opacity(0.2), radius: 20)
         }
     }
 }
