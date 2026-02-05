@@ -35,7 +35,7 @@ enum OperatingMode: UInt32 {
 
     var icon: String {
         switch self {
-        case .homeScreen: return "house"
+        case .homeScreen: return "powerplug"
         case .soldering: return "flame.fill"
         case .sleeping: return "moon.zzz.fill"
         case .settingsMenu: return "gear"

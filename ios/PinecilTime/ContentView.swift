@@ -84,8 +84,10 @@ struct ContentView: View {
             // Device name
             Text(bleManager.deviceName)
                 .font(.subheadline.bold())
+                .lineLimit(1)
+                .truncationMode(.tail)
 
-            Spacer()
+            Spacer(minLength: 8)
 
             // Stats
             HStack(spacing: 12) {
@@ -93,10 +95,12 @@ struct ContentView: View {
                 statItem(value: String(format: "%.1f", bleManager.liveData.voltage), unit: "V")
                 statItem(value: "\(bleManager.liveData.powerPercent)", unit: "%")
             }
+            .layoutPriority(1)
 
             // Mode indicator
             if let mode = bleManager.liveData.mode {
                 Image(systemName: mode.icon)
+                    .font(.caption)
                     .foregroundStyle(mode.isActive ? .orange : .secondary)
             }
         }
@@ -126,17 +130,20 @@ struct ContentView: View {
     // MARK: - Slider Panel
 
     private var sliderPanel: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("Target")
-                    .font(.subheadline)
+        HStack(spacing: 16) {
+            // Target temperature display
+            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                Text("\(Int(targetTemp))")
+                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+                    .contentTransition(.numericText())
+                Text("°")
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(Int(targetTemp))°C")
-                    .font(.subheadline.monospacedDigit().bold())
-                    .foregroundStyle(colorForTemp(targetTemp, maxTemp: 450))
             }
+            .foregroundStyle(colorForTemp(targetTemp, maxTemp: 450))
+            .frame(width: 60)
 
+            // Slider
             Slider(
                 value: $targetTemp,
                 in: 10...450,
@@ -161,8 +168,8 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .padding(.vertical, 14)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Helpers
@@ -175,6 +182,7 @@ struct ContentView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+        .fixedSize()
     }
 
     private func colorForTemp(_ temp: Double, maxTemp: Double) -> Color {
@@ -212,12 +220,12 @@ struct ContentView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 20) {
-                if bleManager.isScanning || bleManager.connectionState == .connecting {
+                if bleManager.isScanning || bleManager.connectionState == BLEManager.ConnectionState.connecting {
                     ProgressView()
                         .scaleEffect(1.2)
                         .padding(.bottom, 4)
 
-                    Text(bleManager.connectionState == .connecting ? "Connecting..." : "Scanning...")
+                    Text(bleManager.connectionState == BLEManager.ConnectionState.connecting ? "Connecting..." : "Scanning...")
                         .font(.headline)
 
                     Text("Looking for your Pinecil")
