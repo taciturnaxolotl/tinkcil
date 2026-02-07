@@ -18,6 +18,8 @@ class BLEManager: NSObject {
     var liveData = IronOSLiveData()
     var deviceName: String = ""
     var firmwareVersion: String = ""
+    var buildID: String = ""
+    var deviceSerial: String = ""
 
     // Temperature history for graph
     var temperatureHistory: [TemperaturePoint] = []
@@ -30,6 +32,8 @@ class BLEManager: NSObject {
     private var pollTimer: Timer?
     private var scanTimer: Timer?
     private let bleQueue = DispatchQueue(label: "com.pineciltime.ble", qos: .userInitiated)
+    private var pendingWrites: [CBUUID: UInt16] = [:]
+    private var settingReadCompletions: [CBUUID: (UInt16?) -> Void] = [:]
 
     // MARK: - Init
 
@@ -110,14 +114,61 @@ class BLEManager: NSObject {
     }
 
     func setTemperature(_ temp: UInt32) {
+        writeSetting(index: 0, value: UInt16(temp))
+    }
+    
+    func writeSetting(index: UInt16, value: UInt16) {
         guard connectionState == .connected,
-              let peripheral = connectedPeripheral,
-              let characteristic = discoveredCharacteristics[IronOSUUIDs.setpointSetting] else {
+              let peripheral = connectedPeripheral else {
             return
         }
-
-        let value = UInt16(temp).data
-        peripheral.writeValue(value, for: characteristic, type: .withoutResponse)
+        
+        let uuid = IronOSUUIDs.settingUUID(index: index)
+        
+        // If we have the characteristic cached, use it
+        if let characteristic = discoveredCharacteristics[uuid] {
+            peripheral.writeValue(value.data, for: characteristic, type: .withResponse)
+        } else {
+            // Otherwise discover it first
+            if let settingsService = peripheral.services?.first(where: { $0.uuid == IronOSUUIDs.settingsService }) {
+                peripheral.discoverCharacteristics([uuid], for: settingsService)
+                // Store for later write after discovery
+                pendingWrites[uuid] = value
+            }
+        }
+    }
+    
+    func readSetting(index: UInt16, completion: @escaping (UInt16?) -> Void) {
+        guard connectionState == .connected,
+              let peripheral = connectedPeripheral else {
+            completion(nil)
+            return
+        }
+        
+        let uuid = IronOSUUIDs.settingUUID(index: index)
+        
+        // Store completion handler
+        settingReadCompletions[uuid] = completion
+        
+        if let characteristic = discoveredCharacteristics[uuid] {
+            peripheral.readValue(for: characteristic)
+        } else {
+            // Discover it first
+            if let settingsService = peripheral.services?.first(where: { $0.uuid == IronOSUUIDs.settingsService }) {
+                peripheral.discoverCharacteristics([uuid], for: settingsService)
+            }
+        }
+    }
+    
+    func saveSettings() {
+        guard connectionState == .connected,
+              let peripheral = connectedPeripheral,
+              let characteristic = discoveredCharacteristics[IronOSUUIDs.saveSettings] else {
+            return
+        }
+        
+        let value = UInt16(1).data
+        peripheral.writeValue(value, for: characteristic, type: .withResponse)
     }
 
     func setSlowPolling() {
@@ -202,8 +253,15 @@ class BLEManager: NSObject {
             case IronOSUUIDs.maxTemp:
                 liveData.maxTemp = value.toUInt32() ?? 450
 
-            case IronOSUUIDs.firmwareVersion:
+            case IronOSUUIDs.buildID:
+                // Build version is the actual firmware version string
                 firmwareVersion = value.toString() ?? ""
+                buildID = value.toString() ?? ""
+            
+            case IronOSUUIDs.deviceSerial:
+                if let serial = value.toUInt64() {
+                    deviceSerial = String(format: "%016llX", serial)
+                }
 
             default:
                 break
@@ -240,8 +298,10 @@ extension BLEManager: CBCentralManagerDelegate {
         DispatchQueue.main.async { [self] in
             // Auto-connect to first discovered Pinecil
             if connectedPeripheral == nil {
-                if peripheral.name?.hasPrefix("PrattlePin-") == true ||
-                   advertisementData[CBAdvertisementDataServiceUUIDsKey] != nil {
+                // Match either Pinecil-* or by the advertised service UUID
+                if peripheral.name?.hasPrefix("Pinecil-") == true ||
+                   peripheral.name?.hasPrefix("PrattlePin-") == true ||
+                   (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID])?.contains(IronOSUUIDs.bulkDataService) == true {
                     connect(to: peripheral)
                     return
                 }
@@ -302,15 +362,27 @@ extension BLEManager: CBPeripheralDelegate {
         for characteristic in characteristics {
             discoveredCharacteristics[characteristic.uuid] = characteristic
 
-            // Read bulk data and firmware version on connect
+            // Read bulk data and device info on connect
             if characteristic.uuid == IronOSUUIDs.bulkLiveData ||
-               characteristic.uuid == IronOSUUIDs.firmwareVersion {
+               characteristic.uuid == IronOSUUIDs.buildID ||
+               characteristic.uuid == IronOSUUIDs.deviceSerial {
                 peripheral.readValue(for: characteristic)
             }
 
             // Enable notifications for operating mode
             if characteristic.uuid == IronOSUUIDs.operatingMode {
                 peripheral.setNotifyValue(true, for: characteristic)
+            }
+            
+            // Handle pending writes for dynamically discovered settings
+            if let pendingValue = pendingWrites[characteristic.uuid] {
+                peripheral.writeValue(pendingValue.data, for: characteristic, type: .withResponse)
+                pendingWrites.removeValue(forKey: characteristic.uuid)
+            }
+            
+            // Handle pending reads for dynamically discovered settings
+            if settingReadCompletions[characteristic.uuid] != nil {
+                peripheral.readValue(for: characteristic)
             }
         }
 
@@ -326,6 +398,17 @@ extension BLEManager: CBPeripheralDelegate {
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
         if error != nil { return }
+        
+        // Check if this is a setting read completion
+        if let completion = settingReadCompletions[characteristic.uuid] {
+            let value = characteristic.value?.withUnsafeBytes { $0.load(as: UInt16.self) }
+            DispatchQueue.main.async {
+                completion(value)
+            }
+            settingReadCompletions.removeValue(forKey: characteristic.uuid)
+            return
+        }
+        
         handleCharacteristicValue(characteristic)
     }
 

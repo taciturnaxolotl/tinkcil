@@ -11,8 +11,8 @@ enum IronOSUUIDs {
     // MARK: - Bulk Data Service (for discovery)
     static let bulkDataService = CBUUID(string: "9EAE1000-9D0D-48C5-AA55-33E27F9BC533")
     static let bulkLiveData = CBUUID(string: "9EAE1001-9D0D-48C5-AA55-33E27F9BC533")
-    static let firmwareVersion = CBUUID(string: "9EAE1003-9D0D-48C5-AA55-33E27F9BC533")
-    static let deviceSerial = CBUUID(string: "9EAE1004-9D0D-48C5-AA55-33E27F9BC533")
+    static let buildID = CBUUID(string: "9EAE1003-9D0D-48C5-AA55-33E27F9BC533") // Firmware build version
+    static let deviceSerial = CBUUID(string: "9EAE1004-9D0D-48C5-AA55-33E27F9BC533") // MAC address
 
     // MARK: - Live Data Service
     static let liveDataService = CBUUID(string: "D85EF000-168E-4A71-AA55-33E27F9BC533")
@@ -33,8 +33,12 @@ enum IronOSUUIDs {
 
     // MARK: - Settings Service
     static let settingsService = CBUUID(string: "F6D80000-5A10-4EBA-AA55-33E27F9BC533")
-    // Setting 0 = Setpoint temperature (writable)
-    static let setpointSetting = CBUUID(string: "F6D70000-5A10-4EBA-AA55-33E27F9BC533")
     static let saveSettings = CBUUID(string: "F6D7FFFF-5A10-4EBA-AA55-33E27F9BC533")
     static let resetSettings = CBUUID(string: "F6D7FFFE-5A10-4EBA-AA55-33E27F9BC533")
+    
+    // Helper to generate setting UUID from index
+    static func settingUUID(index: UInt16) -> CBUUID {
+        let hexString = String(format: "F6D7%04X-5A10-4EBA-AA55-33E27F9BC533", index)
+        return CBUUID(string: hexString)
+    }
 }

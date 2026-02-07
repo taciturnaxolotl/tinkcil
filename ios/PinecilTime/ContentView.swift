@@ -11,6 +11,8 @@ struct ContentView: View {
     @State private var isEditingSlider = false
     @State private var lastSentTemp: Double = 0
     @State private var lastSendTime: Date = .distantPast
+    @State private var isTopBarExpanded = false
+    @State private var showingSettings = false
 
     private var isHeating: Bool {
         bleManager.liveData.mode?.isActive ?? false
@@ -80,34 +82,103 @@ struct ContentView: View {
     // MARK: - Top Bar
 
     private var topBar: some View {
-        HStack(spacing: 16) {
-            // Device name
-            Text(bleManager.deviceName)
-                .font(.subheadline.bold())
-                .lineLimit(1)
-                .truncationMode(.tail)
+        VStack(spacing: 0) {
+            // Main top bar (always visible)
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isTopBarExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 16) {
+                    // Device name
+                    Text(bleManager.deviceName)
+                        .font(.subheadline.bold())
+                        .lineLimit(1)
+                        .truncationMode(.tail)
 
-            Spacer(minLength: 8)
+                    Spacer(minLength: 8)
 
-            // Stats
-            HStack(spacing: 12) {
-                statItem(value: String(format: "%.1f", bleManager.liveData.watts), unit: "W")
-                statItem(value: String(format: "%.1f", bleManager.liveData.voltage), unit: "V")
-                statItem(value: "\(bleManager.liveData.powerPercent)", unit: "%")
+                    // Stats
+                    HStack(spacing: 12) {
+                        statItem(value: String(format: "%.1f", bleManager.liveData.watts), unit: "W")
+                        statItem(value: String(format: "%.1f", bleManager.liveData.voltage), unit: "V")
+                        statItem(value: "\(bleManager.liveData.powerPercent)", unit: "%")
+                    }
+                    .layoutPriority(1)
+
+                    // Mode indicator
+                    if let mode = bleManager.liveData.mode {
+                        Image(systemName: mode.icon)
+                            .font(.caption)
+                            .foregroundStyle(mode.isActive ? .orange : .secondary)
+                    }
+                    
+                    // Expand chevron
+                    Image(systemName: "chevron.down")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isTopBarExpanded ? 180 : 0))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
             }
-            .layoutPriority(1)
-
-            // Mode indicator
-            if let mode = bleManager.liveData.mode {
-                Image(systemName: mode.icon)
-                    .font(.caption)
-                    .foregroundStyle(mode.isActive ? .orange : .secondary)
+            .buttonStyle(.plain)
+            
+            // Expanded info section
+            if isTopBarExpanded {
+                VStack(spacing: 12) {
+                    Divider()
+                        .padding(.horizontal, 20)
+                    
+                    VStack(spacing: 8) {
+                        HStack {
+                            detailItem(label: "Handle", value: String(format: "%.1f°C", bleManager.liveData.handleTempC))
+                            Spacer()
+                            detailItem(label: "Tip Resist", value: String(format: "%.2f Ω", bleManager.liveData.resistance))
+                        }
+                        
+                        HStack {
+                            detailItem(label: "Mode", value: bleManager.liveData.mode?.displayName ?? "Unknown")
+                            Spacer()
+                            detailItem(label: "Power", value: bleManager.liveData.power?.displayName ?? "Unknown")
+                        }
+                        
+                        if !bleManager.firmwareVersion.isEmpty {
+                            HStack {
+                                detailItem(label: "Firmware", value: bleManager.firmwareVersion)
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+                    
+                    // Settings button
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "gear")
+                            Text("Settings & Info")
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 16)
+        .sheet(isPresented: $showingSettings) {
+            SettingsView(bleManager: bleManager)
+        }
     }
 
     // MARK: - Temperature Display
@@ -186,6 +257,17 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
         }
         .fixedSize()
+    }
+    
+    private func detailItem(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+        }
     }
 
     private func colorForTemp(_ temp: Double, maxTemp: Double) -> Color {
