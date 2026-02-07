@@ -134,7 +134,8 @@ struct ContentView: View {
                         .rotationEffect(.degrees(isTopBarExpanded ? 180 : 0))
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.vertical, 16)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             
