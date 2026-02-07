@@ -3,6 +3,7 @@
 //  PinecilTime
 //
 
+import CoreBluetooth
 import Foundation
 import SwiftUI
 
@@ -70,6 +71,55 @@ struct TemperaturePoint: Identifiable {
     let timestamp: Date
     let actualTemp: UInt32
     let setpoint: UInt32
+}
+
+// MARK: - Circular Buffer
+
+@Observable
+class CircularBuffer<T> {
+    private var buffer: [T]
+    private var writeIndex = 0
+    private(set) var isFull = false
+    let capacity: Int
+    
+    var elements: [T] {
+        if isFull {
+            return Array(buffer[writeIndex...]) + Array(buffer[..<writeIndex])
+        } else {
+            return Array(buffer[..<writeIndex])
+        }
+    }
+    
+    var count: Int {
+        isFull ? capacity : writeIndex
+    }
+    
+    init(capacity: Int) {
+        self.capacity = capacity
+        self.buffer = []
+        self.buffer.reserveCapacity(capacity)
+    }
+    
+    func append(_ element: T) {
+        if buffer.count < capacity {
+            buffer.append(element)
+            writeIndex = buffer.count
+            if writeIndex == capacity {
+                isFull = true
+                writeIndex = 0
+            }
+        } else {
+            buffer[writeIndex] = element
+            writeIndex = (writeIndex + 1) % capacity
+            isFull = true
+        }
+    }
+    
+    func clear() {
+        buffer.removeAll(keepingCapacity: true)
+        writeIndex = 0
+        isFull = false
+    }
 }
 
 // MARK: - Live Data
@@ -149,12 +199,12 @@ class IronOSLiveData {
 
 extension Data {
     func toUInt32() -> UInt32? {
-        guard count >= 4 else { return nil }
+        guard count >= MemoryLayout<UInt32>.size else { return nil }
         return withUnsafeBytes { $0.load(as: UInt32.self) }
     }
 
     func toUInt64() -> UInt64? {
-        guard count >= 8 else { return nil }
+        guard count >= MemoryLayout<UInt64>.size else { return nil }
         return withUnsafeBytes { $0.load(as: UInt64.self) }
     }
 
@@ -166,5 +216,70 @@ extension Data {
 extension UInt16 {
     var data: Data {
         withUnsafeBytes(of: self) { Data($0) }
+    }
+}
+
+// MARK: - Settings Cache
+
+@Observable
+class SettingsCache {
+    private(set) var cache: [UInt16: UInt16] = [:]
+    private let userDefaults = UserDefaults.standard
+    private let cacheKey = "pinecilSettingsCache"
+    
+    init() {
+        loadFromDisk()
+    }
+    
+    func set(_ value: UInt16, for index: UInt16) {
+        cache[index] = value
+        saveToDisk()
+    }
+    
+    func get(_ index: UInt16) -> UInt16? {
+        cache[index]
+    }
+    
+    func clear() {
+        cache.removeAll()
+        userDefaults.removeObject(forKey: cacheKey)
+    }
+    
+    private func saveToDisk() {
+        let data = cache.map { ["index": $0.key, "value": $0.value] }
+        userDefaults.set(data, forKey: cacheKey)
+    }
+    
+    private func loadFromDisk() {
+        guard let data = userDefaults.array(forKey: cacheKey) as? [[String: UInt16]] else { return }
+        cache = Dictionary(uniqueKeysWithValues: data.compactMap { dict in
+            guard let index = dict["index"], let value = dict["value"] else { return nil }
+            return (index, value)
+        })
+    }
+}
+
+// MARK: - BLE Error
+
+enum BLEError: LocalizedError, Equatable {
+    case notConnected
+    case characteristicNotFound(CBUUID)
+    case readFailed(String)
+    case writeFailed(String)
+    case timeout
+    
+    var errorDescription: String? {
+        switch self {
+        case .notConnected:
+            return "Device not connected"
+        case .characteristicNotFound(let uuid):
+            return "Characteristic not found: \(uuid.uuidString)"
+        case .readFailed(let reason):
+            return "Read failed: \(reason)"
+        case .writeFailed(let reason):
+            return "Write failed: \(reason)"
+        case .timeout:
+            return "Operation timed out"
+        }
     }
 }

@@ -21,9 +21,15 @@ class BLEManager: NSObject {
     var buildID: String = ""
     var deviceSerial: String = ""
 
-    // Temperature history for graph
-    var temperatureHistory: [TemperaturePoint] = []
-    private let maxHistoryPoints = 60
+    // Temperature history for graph (circular buffer)
+    var temperatureHistory = CircularBuffer<TemperaturePoint>(capacity: 60)
+    var temperatureHistoryArray: [TemperaturePoint] { temperatureHistory.elements }
+    
+    // Settings cache
+    var settingsCache = SettingsCache()
+    
+    // Error state
+    var lastError: BLEError?
 
     // MARK: - Private
 
@@ -32,6 +38,7 @@ class BLEManager: NSObject {
     private var pollTimer: Timer?
     private var scanTimer: Timer?
     private let bleQueue = DispatchQueue(label: "com.pineciltime.ble", qos: .userInitiated)
+    private let timerQueue = DispatchQueue.main
     private var pendingWrites: [CBUUID: UInt16] = [:]
     private var settingReadCompletions: [CBUUID: (UInt16?) -> Void] = [:]
 
@@ -80,6 +87,7 @@ class BLEManager: NSObject {
         scanTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
             self?.stopScanning()
         }
+        RunLoop.main.add(scanTimer!, forMode: .common)
     }
 
     func stopScanning() {
@@ -110,16 +118,20 @@ class BLEManager: NSObject {
         connectionState = .disconnected
         connectedPeripheral = nil
         discoveredCharacteristics.removeAll()
-        temperatureHistory.removeAll()
+        temperatureHistory.clear()
+        lastError = nil
     }
 
+    @MainActor
     func setTemperature(_ temp: UInt32) {
         writeSetting(index: 0, value: UInt16(temp))
     }
     
+    @MainActor
     func writeSetting(index: UInt16, value: UInt16) {
         guard connectionState == .connected,
               let peripheral = connectedPeripheral else {
+            lastError = .notConnected
             return
         }
         
@@ -128,19 +140,30 @@ class BLEManager: NSObject {
         // If we have the characteristic cached, use it
         if let characteristic = discoveredCharacteristics[uuid] {
             peripheral.writeValue(value.data, for: characteristic, type: .withResponse)
+            settingsCache.set(value, for: index)
         } else {
             // Otherwise discover it first
             if let settingsService = peripheral.services?.first(where: { $0.uuid == IronOSUUIDs.settingsService }) {
                 peripheral.discoverCharacteristics([uuid], for: settingsService)
                 // Store for later write after discovery
                 pendingWrites[uuid] = value
+            } else {
+                lastError = .characteristicNotFound(uuid)
             }
         }
     }
     
+    @MainActor
     func readSetting(index: UInt16, completion: @escaping (UInt16?) -> Void) {
+        // Check cache first
+        if let cached = settingsCache.get(index) {
+            completion(cached)
+            return
+        }
+        
         guard connectionState == .connected,
               let peripheral = connectedPeripheral else {
+            lastError = .notConnected
             completion(nil)
             return
         }
@@ -156,14 +179,20 @@ class BLEManager: NSObject {
             // Discover it first
             if let settingsService = peripheral.services?.first(where: { $0.uuid == IronOSUUIDs.settingsService }) {
                 peripheral.discoverCharacteristics([uuid], for: settingsService)
+            } else {
+                lastError = .characteristicNotFound(uuid)
+                completion(nil)
+                settingReadCompletions.removeValue(forKey: uuid)
             }
         }
     }
     
+    @MainActor
     func saveSettings() {
         guard connectionState == .connected,
               let peripheral = connectedPeripheral,
               let characteristic = discoveredCharacteristics[IronOSUUIDs.saveSettings] else {
+            lastError = .notConnected
             return
         }
         
@@ -173,16 +202,30 @@ class BLEManager: NSObject {
 
     func setSlowPolling() {
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
-            self?.readBulkData()
+        pollTimer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.readBulkData()
+            }
+        }
+        timerQueue.async { [weak self] in
+            guard let timer = self?.pollTimer else { return }
+            RunLoop.main.add(timer, forMode: .common)
         }
     }
 
     func setFastPolling() {
         guard connectionState == .connected else { return }
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.readBulkData()
+        pollTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.readBulkData()
+            }
+        }
+        timerQueue.async { [weak self] in
+            guard let timer = self?.pollTimer else { return }
+            RunLoop.main.add(timer, forMode: .common)
         }
     }
 
@@ -191,11 +234,20 @@ class BLEManager: NSObject {
     private func startPolling() {
         stopPolling()
 
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.readBulkData()
+        pollTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.readBulkData()
+            }
         }
-
-        readBulkData()
+        timerQueue.async { [weak self] in
+            guard let timer = self?.pollTimer else { return }
+            RunLoop.main.add(timer, forMode: .common)
+        }
+        
+        Task { @MainActor in
+            readBulkData()
+        }
     }
 
     private func stopPolling() {
@@ -203,6 +255,7 @@ class BLEManager: NSObject {
         pollTimer = nil
     }
 
+    @MainActor
     private func readBulkData() {
         guard let characteristic = discoveredCharacteristics[IronOSUUIDs.bulkLiveData],
               let peripheral = connectedPeripheral else { return }
@@ -218,18 +271,13 @@ class BLEManager: NSObject {
         )
 
         temperatureHistory.append(point)
-
-        // Keep only last N points
-        if temperatureHistory.count > maxHistoryPoints {
-            temperatureHistory.removeFirst()
-        }
     }
 
+    @MainActor
     private func handleCharacteristicValue(_ characteristic: CBCharacteristic) {
         guard let value = characteristic.value else { return }
-
-        DispatchQueue.main.async { [self] in
-            switch characteristic.uuid {
+        
+        switch characteristic.uuid {
             case IronOSUUIDs.bulkLiveData:
                 liveData.updateFromBulkData(value)
                 recordTemperature()
@@ -265,7 +313,6 @@ class BLEManager: NSObject {
 
             default:
                 break
-            }
         }
     }
 }
@@ -397,23 +444,42 @@ extension BLEManager: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
-        if error != nil { return }
+        guard error == nil else {
+            DispatchQueue.main.async { [weak self] in
+                self?.lastError = .readFailed(error?.localizedDescription ?? "Unknown error")
+            }
+            return
+        }
         
         // Check if this is a setting read completion
         if let completion = settingReadCompletions[characteristic.uuid] {
             let value = characteristic.value?.withUnsafeBytes { $0.load(as: UInt16.self) }
-            DispatchQueue.main.async {
-                completion(value)
+            if let value = value, let index = IronOSUUIDs.settingIndex(from: characteristic.uuid) {
+                DispatchQueue.main.async { [weak self] in
+                    self?.settingsCache.set(value, for: index)
+                    completion(value)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    completion(value)
+                }
             }
             settingReadCompletions.removeValue(forKey: characteristic.uuid)
             return
         }
         
-        handleCharacteristicValue(characteristic)
+        Task { @MainActor in
+            handleCharacteristicValue(characteristic)
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
                     didWriteValueFor characteristic: CBCharacteristic,
                     error: Error?) {
+        if let error = error {
+            DispatchQueue.main.async { [weak self] in
+                self?.lastError = .writeFailed(error.localizedDescription)
+            }
+        }
     }
 }

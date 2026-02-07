@@ -43,7 +43,7 @@ struct SettingsView: View {
 struct ConfigurationView: View {
     let bleManager: BLEManager
     @State private var settings: [Int: UInt16] = [:]
-    @State private var isLoading = true
+    @State private var isLoading = false
     @State private var saveInProgress = false
     
     var body: some View {
@@ -289,19 +289,39 @@ struct ConfigurationView: View {
         .task {
             await loadSettings()
         }
+        .onAppear {
+            // Pre-populate from cache
+            let settingsToLoad: [UInt16] = [0, 1, 2, 6, 7, 11, 13, 14, 17, 22, 24, 25, 26, 27, 28, 33, 34]
+            for index in settingsToLoad {
+                if let cached = bleManager.settingsCache.get(index) {
+                    settings[Int(index)] = cached
+                }
+            }
+        }
     }
     
     private func loadSettings() async {
-        // Load commonly used settings
+        // Load commonly used settings (will use cache if available)
         let settingsToLoad: [UInt16] = [0, 1, 2, 6, 7, 11, 13, 14, 17, 22, 24, 25, 26, 27, 28, 33, 34]
         
-        for index in settingsToLoad {
-            bleManager.readSetting(index: index) { value in
-                if let value = value {
-                    settings[Int(index)] = value
+        isLoading = true
+        
+        await withTaskGroup(of: (Int, UInt16?).self) { group in
+            for index in settingsToLoad {
+                group.addTask { @MainActor in
+                    await withCheckedContinuation { (continuation: CheckedContinuation<(Int, UInt16?), Never>) in
+                        bleManager.readSetting(index: index) { value in
+                            continuation.resume(returning: (Int(index), value))
+                        }
+                    }
                 }
             }
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms between reads
+            
+            for await (index, value) in group {
+                if let value = value {
+                    settings[index] = value
+                }
+            }
         }
         
         isLoading = false

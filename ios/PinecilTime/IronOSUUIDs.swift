@@ -41,4 +41,14 @@ enum IronOSUUIDs {
         let hexString = String(format: "F6D7%04X-5A10-4EBA-AA55-33E27F9BC533", index)
         return CBUUID(string: hexString)
     }
+    
+    // Helper to extract setting index from UUID
+    static func settingIndex(from uuid: CBUUID) -> UInt16? {
+        let uuidString = uuid.uuidString.uppercased()
+        guard uuidString.hasPrefix("F6D7") && uuidString.hasSuffix("-5A10-4EBA-AA55-33E27F9BC533") else {
+            return nil
+        }
+        let hexIndex = String(uuidString.prefix(8).suffix(4))
+        return UInt16(hexIndex, radix: 16)
+    }
 }

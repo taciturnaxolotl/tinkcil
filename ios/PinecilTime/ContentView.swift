@@ -13,17 +13,18 @@ struct ContentView: View {
     @State private var lastSendTime: Date = .distantPast
     @State private var isTopBarExpanded = false
     @State private var showingSettings = false
+    @State private var showingError = false
 
     private var isHeating: Bool {
-        bleManager.liveData.mode?.isActive ?? false
+        bleManager.liveData.mode?.isActive == true
     }
 
     var body: some View {
         ZStack {
             // Background graph
-            if !bleManager.temperatureHistory.isEmpty {
+            if bleManager.temperatureHistory.count > 0 {
                 TemperatureGraph(
-                    history: bleManager.temperatureHistory,
+                    history: bleManager.temperatureHistoryArray,
                     currentSetpoint: Int(targetTemp)
                 )
                 .padding(.horizontal, 20)
@@ -42,6 +43,18 @@ struct ContentView: View {
             if !isEditingSlider && newValue > 0 {
                 targetTemp = Double(newValue)
             }
+        }
+        .onChange(of: bleManager.lastError) { _, error in
+            if error != nil {
+                showingError = true
+            }
+        }
+        .alert("Bluetooth Error", isPresented: $showingError, presenting: bleManager.lastError) { _ in
+            Button("OK") {
+                bleManager.lastError = nil
+            }
+        } message: { error in
+            Text(error.localizedDescription)
         }
     }
 
@@ -135,7 +148,7 @@ struct ContentView: View {
                         HStack {
                             detailItem(label: "Handle", value: String(format: "%.1f°C", bleManager.liveData.handleTempC))
                             Spacer()
-                            detailItem(label: "Tip Resist", value: String(format: "%.2f Ω", bleManager.liveData.resistance))
+                            detailItem(label: "Tip Resistance", value: String(format: "%.2f Ω", bleManager.liveData.resistance))
                         }
                         
                         HStack {
@@ -231,6 +244,8 @@ struct ContentView: View {
                 }
             )
             .tint(colorForTemp(targetTemp, maxTemp: 450))
+            .accessibilityLabel("Target temperature")
+            .accessibilityValue("\(Int(targetTemp)) degrees")
             .onChange(of: targetTemp) { _, newValue in
                 guard isEditingSlider else { return }
                 let now = Date()
@@ -271,7 +286,7 @@ struct ContentView: View {
     }
 
     private func colorForTemp(_ temp: Double, maxTemp: Double) -> Color {
-        let progress = Swift.min(Swift.max(temp / maxTemp, 0), 1)
+        let progress = min(max(temp / maxTemp, 0), 1)
 
         if progress < 0.33 {
             let t = progress / 0.33
