@@ -258,11 +258,7 @@ struct ConfigurationView: View {
             
             Section {
                 Button {
-                    saveInProgress = true
-                    bleManager.saveSettings()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        saveInProgress = false
-                    }
+                    saveSettings()
                 } label: {
                     HStack {
                         Spacer()
@@ -287,19 +283,32 @@ struct ConfigurationView: View {
             }
         }
         .task {
-            await loadSettings()
-        }
-        .onAppear {
-            // Pre-populate from cache
+            // Pre-populate from cache first for instant display
             let settingsToLoad: [UInt16] = [0, 1, 2, 6, 7, 11, 13, 14, 17, 22, 24, 25, 26, 27, 28, 33, 34]
             for index in settingsToLoad {
                 if let cached = bleManager.settingsCache.get(index) {
                     settings[Int(index)] = cached
                 }
             }
+
+            // Then load from device in background
+            await loadSettings()
         }
     }
-    
+
+    private func saveSettings() {
+        saveInProgress = true
+        bleManager.saveSettings()
+
+        // Wait for a reasonable time for the write operation
+        Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            await MainActor.run {
+                saveInProgress = false
+            }
+        }
+    }
+
     private func loadSettings() async {
         // Load commonly used settings (will use cache if available)
         let settingsToLoad: [UInt16] = [0, 1, 2, 6, 7, 11, 13, 14, 17, 22, 24, 25, 26, 27, 28, 33, 34]

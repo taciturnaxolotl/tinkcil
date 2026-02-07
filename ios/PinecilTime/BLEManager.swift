@@ -39,8 +39,10 @@ class BLEManager: NSObject {
     private var scanTimer: Timer?
     private let bleQueue = DispatchQueue(label: "com.pineciltime.ble", qos: .userInitiated)
     private let timerQueue = DispatchQueue.main
+    private let operationQueue = DispatchQueue(label: "com.pineciltime.operations", qos: .userInitiated)
     private var pendingWrites: [CBUUID: UInt16] = [:]
     private var settingReadCompletions: [CBUUID: (UInt16?) -> Void] = [:]
+    private var operationTimeouts: [CBUUID: DispatchWorkItem] = [:]
 
     // MARK: - Init
 
@@ -84,10 +86,15 @@ class BLEManager: NSObject {
         isScanning = true
 
         // Timeout after 10 seconds
-        scanTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
-            self?.stopScanning()
+        timerQueue.async { [weak self] in
+            guard let self else { return }
+            self.scanTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
+                self?.stopScanning()
+            }
+            if let timer = self.scanTimer {
+                RunLoop.main.add(timer, forMode: .common)
+            }
         }
-        RunLoop.main.add(scanTimer!, forMode: .common)
     }
 
     func stopScanning() {
@@ -115,6 +122,17 @@ class BLEManager: NSObject {
             centralManager.cancelPeripheralConnection(peripheral)
         }
 
+        // Clean up all state
+        operationQueue.sync {
+            // Cancel all pending operations
+            for timeout in operationTimeouts.values {
+                timeout.cancel()
+            }
+            operationTimeouts.removeAll()
+            pendingWrites.removeAll()
+            settingReadCompletions.removeAll()
+        }
+
         connectionState = .disconnected
         connectedPeripheral = nil
         discoveredCharacteristics.removeAll()
@@ -134,21 +152,25 @@ class BLEManager: NSObject {
             lastError = .notConnected
             return
         }
-        
+
         let uuid = IronOSUUIDs.settingUUID(index: index)
-        
-        // If we have the characteristic cached, use it
-        if let characteristic = discoveredCharacteristics[uuid] {
-            peripheral.writeValue(value.data, for: characteristic, type: .withResponse)
-            settingsCache.set(value, for: index)
-        } else {
-            // Otherwise discover it first
-            if let settingsService = peripheral.services?.first(where: { $0.uuid == IronOSUUIDs.settingsService }) {
-                peripheral.discoverCharacteristics([uuid], for: settingsService)
-                // Store for later write after discovery
-                pendingWrites[uuid] = value
+
+        operationQueue.sync {
+            // If we have the characteristic cached, use it
+            if let characteristic = discoveredCharacteristics[uuid] {
+                peripheral.writeValue(value.data, for: characteristic, type: .withResponse)
+                settingsCache.set(value, for: index)
+                scheduleOperationTimeout(for: uuid, type: "write")
             } else {
-                lastError = .characteristicNotFound(uuid)
+                // Otherwise discover it first
+                if let settingsService = peripheral.services?.first(where: { $0.uuid == IronOSUUIDs.settingsService }) {
+                    peripheral.discoverCharacteristics([uuid], for: settingsService)
+                    // Store for later write after discovery
+                    pendingWrites[uuid] = value
+                    scheduleOperationTimeout(for: uuid, type: "discover-write")
+                } else {
+                    lastError = .characteristicNotFound(uuid)
+                }
             }
         }
     }
@@ -160,29 +182,33 @@ class BLEManager: NSObject {
             completion(cached)
             return
         }
-        
+
         guard connectionState == .connected,
               let peripheral = connectedPeripheral else {
             lastError = .notConnected
             completion(nil)
             return
         }
-        
+
         let uuid = IronOSUUIDs.settingUUID(index: index)
-        
-        // Store completion handler
-        settingReadCompletions[uuid] = completion
-        
-        if let characteristic = discoveredCharacteristics[uuid] {
-            peripheral.readValue(for: characteristic)
-        } else {
-            // Discover it first
-            if let settingsService = peripheral.services?.first(where: { $0.uuid == IronOSUUIDs.settingsService }) {
-                peripheral.discoverCharacteristics([uuid], for: settingsService)
+
+        operationQueue.sync {
+            // Store completion handler
+            settingReadCompletions[uuid] = completion
+
+            if let characteristic = discoveredCharacteristics[uuid] {
+                peripheral.readValue(for: characteristic)
+                scheduleOperationTimeout(for: uuid, type: "read")
             } else {
-                lastError = .characteristicNotFound(uuid)
-                completion(nil)
-                settingReadCompletions.removeValue(forKey: uuid)
+                // Discover it first
+                if let settingsService = peripheral.services?.first(where: { $0.uuid == IronOSUUIDs.settingsService }) {
+                    peripheral.discoverCharacteristics([uuid], for: settingsService)
+                    scheduleOperationTimeout(for: uuid, type: "discover-read")
+                } else {
+                    lastError = .characteristicNotFound(uuid)
+                    completion(nil)
+                    settingReadCompletions.removeValue(forKey: uuid)
+                }
             }
         }
     }
@@ -201,31 +227,27 @@ class BLEManager: NSObject {
     }
 
     func setSlowPolling() {
-        pollTimer?.invalidate()
-        pollTimer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor in
-                self.readBulkData()
-            }
-        }
-        timerQueue.async { [weak self] in
-            guard let timer = self?.pollTimer else { return }
-            RunLoop.main.add(timer, forMode: .common)
-        }
+        updatePollingInterval(0.2)
     }
 
     func setFastPolling() {
         guard connectionState == .connected else { return }
-        pollTimer?.invalidate()
-        pollTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor in
-                self.readBulkData()
-            }
-        }
+        updatePollingInterval(0.1)
+    }
+
+    private func updatePollingInterval(_ interval: TimeInterval) {
         timerQueue.async { [weak self] in
-            guard let timer = self?.pollTimer else { return }
-            RunLoop.main.add(timer, forMode: .common)
+            guard let self else { return }
+            self.pollTimer?.invalidate()
+            self.pollTimer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.readBulkData()
+                }
+            }
+            if let timer = self.pollTimer {
+                RunLoop.main.add(timer, forMode: .common)
+            }
         }
     }
 
@@ -233,26 +255,57 @@ class BLEManager: NSObject {
 
     private func startPolling() {
         stopPolling()
+        updatePollingInterval(0.1)
 
-        pollTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor in
-                self.readBulkData()
-            }
-        }
-        timerQueue.async { [weak self] in
-            guard let timer = self?.pollTimer else { return }
-            RunLoop.main.add(timer, forMode: .common)
-        }
-        
         Task { @MainActor in
             readBulkData()
         }
     }
 
     private func stopPolling() {
-        pollTimer?.invalidate()
-        pollTimer = nil
+        timerQueue.async { [weak self] in
+            self?.pollTimer?.invalidate()
+            self?.pollTimer = nil
+        }
+    }
+
+    // MARK: - Timeout Management
+
+    private func scheduleOperationTimeout(for uuid: CBUUID, type: String) {
+        // Cancel any existing timeout
+        operationQueue.sync {
+            operationTimeouts[uuid]?.cancel()
+
+            let timeoutWork = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.handleOperationTimeout(uuid: uuid, type: type)
+                }
+            }
+
+            operationTimeouts[uuid] = timeoutWork
+            operationQueue.asyncAfter(deadline: .now() + 5.0, execute: timeoutWork)
+        }
+    }
+
+    private func cancelOperationTimeout(for uuid: CBUUID) {
+        operationQueue.sync {
+            operationTimeouts[uuid]?.cancel()
+            operationTimeouts.removeValue(forKey: uuid)
+        }
+    }
+
+    @MainActor
+    private func handleOperationTimeout(uuid: CBUUID, type: String) {
+        operationQueue.sync {
+            // Clean up any pending operations
+            if let completion = settingReadCompletions.removeValue(forKey: uuid) {
+                lastError = .timeout
+                completion(nil)
+            }
+            pendingWrites.removeValue(forKey: uuid)
+            operationTimeouts.removeValue(forKey: uuid)
+        }
     }
 
     @MainActor
@@ -322,16 +375,17 @@ class BLEManager: NSObject {
 extension BLEManager: CBCentralManagerDelegate {
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        DispatchQueue.main.async { [self] in
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
             switch central.state {
             case .poweredOn:
-                startScanning()
+                self.startScanning()
             case .poweredOff:
-                connectionState = .error("Bluetooth is off")
+                self.connectionState = .error("Bluetooth is off")
             case .unauthorized:
-                connectionState = .error("Bluetooth access denied")
+                self.connectionState = .error("Bluetooth access denied")
             case .unsupported:
-                connectionState = .error("Bluetooth not supported")
+                self.connectionState = .error("Bluetooth not supported")
             default:
                 break
             }
@@ -342,28 +396,30 @@ extension BLEManager: CBCentralManagerDelegate {
                         didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any],
                         rssi RSSI: NSNumber) {
-        DispatchQueue.main.async { [self] in
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
             // Auto-connect to first discovered Pinecil
-            if connectedPeripheral == nil {
+            if self.connectedPeripheral == nil {
                 // Match either Pinecil-* or by the advertised service UUID
                 if peripheral.name?.hasPrefix("Pinecil-") == true ||
                    peripheral.name?.hasPrefix("PrattlePin-") == true ||
                    (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID])?.contains(IronOSUUIDs.bulkDataService) == true {
-                    connect(to: peripheral)
+                    self.connect(to: peripheral)
                     return
                 }
             }
 
-            if !discoveredDevices.contains(where: { $0.identifier == peripheral.identifier }) {
-                discoveredDevices.append(peripheral)
+            if !self.discoveredDevices.contains(where: { $0.identifier == peripheral.identifier }) {
+                self.discoveredDevices.append(peripheral)
             }
         }
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        DispatchQueue.main.async { [self] in
-            connectionState = .connected
-            deviceName = peripheral.name ?? "Pinecil"
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.connectionState = .connected
+            self.deviceName = peripheral.name ?? "Pinecil"
         }
         peripheral.discoverServices(nil)
     }
@@ -371,20 +427,22 @@ extension BLEManager: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager,
                         didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
-        DispatchQueue.main.async { [self] in
-            connectionState = .error(error?.localizedDescription ?? "Connection failed")
-            connectedPeripheral = nil
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.connectionState = .error(error?.localizedDescription ?? "Connection failed")
+            self.connectedPeripheral = nil
         }
     }
 
     func centralManager(_ central: CBCentralManager,
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
-        DispatchQueue.main.async { [self] in
-            stopPolling()
-            connectionState = .disconnected
-            connectedPeripheral = nil
-            discoveredCharacteristics.removeAll()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.stopPolling()
+            self.connectionState = .disconnected
+            self.connectedPeripheral = nil
+            self.discoveredCharacteristics.removeAll()
         }
     }
 }
@@ -422,21 +480,25 @@ extension BLEManager: CBPeripheralDelegate {
             }
             
             // Handle pending writes for dynamically discovered settings
-            if let pendingValue = pendingWrites[characteristic.uuid] {
-                peripheral.writeValue(pendingValue.data, for: characteristic, type: .withResponse)
-                pendingWrites.removeValue(forKey: characteristic.uuid)
-            }
-            
-            // Handle pending reads for dynamically discovered settings
-            if settingReadCompletions[characteristic.uuid] != nil {
-                peripheral.readValue(for: characteristic)
+            operationQueue.sync {
+                if let pendingValue = pendingWrites[characteristic.uuid] {
+                    peripheral.writeValue(pendingValue.data, for: characteristic, type: .withResponse)
+                    pendingWrites.removeValue(forKey: characteristic.uuid)
+                    scheduleOperationTimeout(for: characteristic.uuid, type: "write")
+                }
+
+                // Handle pending reads for dynamically discovered settings
+                if settingReadCompletions[characteristic.uuid] != nil {
+                    peripheral.readValue(for: characteristic)
+                    scheduleOperationTimeout(for: characteristic.uuid, type: "read")
+                }
             }
         }
 
         // Start polling once we have the live data service
         if service.uuid == IronOSUUIDs.liveDataService || service.uuid == IronOSUUIDs.bulkDataService {
-            DispatchQueue.main.async { [self] in
-                startPolling()
+            DispatchQueue.main.async { [weak self] in
+                self?.startPolling()
             }
         }
     }
@@ -445,14 +507,22 @@ extension BLEManager: CBPeripheralDelegate {
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
         guard error == nil else {
+            cancelOperationTimeout(for: characteristic.uuid)
             DispatchQueue.main.async { [weak self] in
                 self?.lastError = .readFailed(error?.localizedDescription ?? "Unknown error")
             }
             return
         }
-        
+
+        // Cancel timeout for successful read
+        cancelOperationTimeout(for: characteristic.uuid)
+
         // Check if this is a setting read completion
-        if let completion = settingReadCompletions[characteristic.uuid] {
+        let completion = operationQueue.sync { () -> ((UInt16?) -> Void)? in
+            settingReadCompletions.removeValue(forKey: characteristic.uuid)
+        }
+
+        if let completion = completion {
             let value = characteristic.value?.withUnsafeBytes { $0.load(as: UInt16.self) }
             if let value = value, let index = IronOSUUIDs.settingIndex(from: characteristic.uuid) {
                 DispatchQueue.main.async { [weak self] in
@@ -464,10 +534,9 @@ extension BLEManager: CBPeripheralDelegate {
                     completion(value)
                 }
             }
-            settingReadCompletions.removeValue(forKey: characteristic.uuid)
             return
         }
-        
+
         Task { @MainActor in
             handleCharacteristicValue(characteristic)
         }
@@ -477,9 +546,13 @@ extension BLEManager: CBPeripheralDelegate {
                     didWriteValueFor characteristic: CBCharacteristic,
                     error: Error?) {
         if let error = error {
+            cancelOperationTimeout(for: characteristic.uuid)
             DispatchQueue.main.async { [weak self] in
                 self?.lastError = .writeFailed(error.localizedDescription)
             }
+        } else {
+            // Cancel timeout on successful write
+            cancelOperationTimeout(for: characteristic.uuid)
         }
     }
 }

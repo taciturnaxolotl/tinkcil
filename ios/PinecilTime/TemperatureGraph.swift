@@ -87,7 +87,7 @@ struct TemperatureGraph: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.1, paused: false)) { timeline in
+        TimelineView(.animation(paused: false)) { timeline in
             let now = timeline.date
             let windowSeconds: TimeInterval = 6
             let xDomain = now.addingTimeInterval(-windowSeconds)...now.addingTimeInterval(1)

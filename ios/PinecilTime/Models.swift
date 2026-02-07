@@ -80,26 +80,28 @@ class CircularBuffer<T> {
     private var buffer: [T]
     private var writeIndex = 0
     private(set) var isFull = false
+    private var cachedElements: [T]?
+    private var cacheInvalidated = false
     let capacity: Int
-    
+
     var elements: [T] {
-        if isFull {
-            return Array(buffer[writeIndex...]) + Array(buffer[..<writeIndex])
-        } else {
-            return Array(buffer[..<writeIndex])
+        if cacheInvalidated {
+            cachedElements = computeElements()
+            cacheInvalidated = false
         }
+        return cachedElements ?? computeElements()
     }
-    
+
     var count: Int {
         isFull ? capacity : writeIndex
     }
-    
+
     init(capacity: Int) {
         self.capacity = capacity
         self.buffer = []
         self.buffer.reserveCapacity(capacity)
     }
-    
+
     func append(_ element: T) {
         if buffer.count < capacity {
             buffer.append(element)
@@ -113,12 +115,23 @@ class CircularBuffer<T> {
             writeIndex = (writeIndex + 1) % capacity
             isFull = true
         }
+        cacheInvalidated = true
     }
-    
+
     func clear() {
         buffer.removeAll(keepingCapacity: true)
         writeIndex = 0
         isFull = false
+        cachedElements = nil
+        cacheInvalidated = false
+    }
+
+    private func computeElements() -> [T] {
+        if isFull {
+            return Array(buffer[writeIndex...]) + Array(buffer[..<writeIndex])
+        } else {
+            return Array(buffer[..<writeIndex])
+        }
     }
 }
 
@@ -167,7 +180,8 @@ class IronOSLiveData {
     }
 
     func updateFromBulkData(_ data: Data) {
-        guard data.count >= 56 else { return }
+        // Validate data size (14 UInt32 values = 56 bytes)
+        guard data.count == 56 else { return }
 
         let values = data.withUnsafeBytes { buffer -> [UInt32] in
             guard let baseAddress = buffer.baseAddress else { return [] }
@@ -178,16 +192,23 @@ class IronOSLiveData {
 
         guard values.count == 14 else { return }
 
-        liveTemp = values[0]
+        // Basic validation of values
+        let temp = values[0]
+        let maxTempValue = values[9]
+
+        // Sanity check temperatures (0-600°C range)
+        guard temp <= 600, maxTempValue <= 600 else { return }
+
+        liveTemp = temp
         setpoint = values[1]
         dcInput = values[2]
         handleTemp = values[3]
-        powerLevel = values[4]
+        powerLevel = min(values[4], 255) // Power level should be 0-255
         powerSource = values[5]
         tipResistance = values[6]
         uptime = values[7]
         lastMovement = values[8]
-        maxTemp = values[9]
+        maxTemp = maxTempValue
         rawTip = values[10]
         hallSensor = values[11]
         operatingMode = values[12]

@@ -238,8 +238,11 @@ struct ContentView: View {
                     if editing {
                         bleManager.setSlowPolling()
                     } else {
-                        bleManager.setTemperature(UInt32(targetTemp))
-                        lastSentTemp = targetTemp
+                        // Only send if value changed
+                        if abs(targetTemp - lastSentTemp) >= 5 {
+                            bleManager.setTemperature(UInt32(targetTemp))
+                            lastSentTemp = targetTemp
+                        }
                         bleManager.setFastPolling()
                     }
                 }
@@ -247,15 +250,6 @@ struct ContentView: View {
             .tint(colorForTemp(targetTemp, maxTemp: 450))
             .accessibilityLabel("Target temperature")
             .accessibilityValue("\(Int(targetTemp)) degrees")
-            .onChange(of: targetTemp) { _, newValue in
-                guard isEditingSlider else { return }
-                let now = Date()
-                if now.timeIntervalSince(lastSendTime) > 0.2 && abs(newValue - lastSentTemp) >= 5 {
-                    bleManager.setTemperature(UInt32(newValue))
-                    lastSentTemp = newValue
-                    lastSendTime = now
-                }
-            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
