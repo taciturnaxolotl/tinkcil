@@ -47,29 +47,27 @@ struct TemperatureGraph: View {
     private func chartDataWithEdge(now: Date, windowSeconds: TimeInterval) -> [ChartDataPoint] {
         var data: [ChartDataPoint] = []
 
-        // Add point slightly before first data point (only if data has scrolled to left edge)
+        // Add point at left edge to extend line to screen edge
         if let first = history.first {
             let windowStart = now.addingTimeInterval(-windowSeconds)
-            if first.timestamp <= windowStart {
-                let leftEdge = windowStart.addingTimeInterval(-1)
-                data.append(ChartDataPoint(
-                    id: "left-setpoint",
-                    timestamp: leftEdge,
-                    value: Int(first.setpoint),
-                    series: "Setpoint"
-                ))
-                data.append(ChartDataPoint(
-                    id: "left-temp",
-                    timestamp: leftEdge,
-                    value: Int(first.actualTemp),
-                    series: "Temp"
-                ))
-            }
+            let leftEdge = windowStart.addingTimeInterval(-0.5)
+            data.append(ChartDataPoint(
+                id: "left-setpoint",
+                timestamp: leftEdge,
+                value: Int(first.setpoint),
+                series: "Setpoint"
+            ))
+            data.append(ChartDataPoint(
+                id: "left-temp",
+                timestamp: leftEdge,
+                value: Int(first.actualTemp),
+                series: "Temp"
+            ))
         }
 
         data.append(contentsOf: chartData)
 
-        // Add point at right edge
+        // Add point at right edge to extend line to screen edge (1 sec ahead)
         if let last = history.last {
             let rightEdge = now.addingTimeInterval(1)
             data.append(ChartDataPoint(
@@ -92,7 +90,7 @@ struct TemperatureGraph: View {
         TimelineView(.animation(minimumInterval: 0.1, paused: false)) { timeline in
             let now = timeline.date
             let windowSeconds: TimeInterval = 6
-            let xDomain = now.addingTimeInterval(-windowSeconds)...now
+            let xDomain = now.addingTimeInterval(-windowSeconds)...now.addingTimeInterval(1)
 
             Chart(chartDataWithEdge(now: now, windowSeconds: windowSeconds)) { point in
                 LineMark(
@@ -108,6 +106,7 @@ struct TemperatureGraph: View {
             .chartLegend(.hidden)
             .chartYScale(domain: 0...500)
             .chartXScale(domain: xDomain)
+            .padding(.horizontal, -20)
         }
     }
 }
