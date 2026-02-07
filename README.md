@@ -1,8 +1,8 @@
-# pinecilTime
+# tinkcil
 
 a really cool ios app for the pinecil that adds wakatime
 
-The canonical repo for this is hosted on tangled over at [`dunkirk.sh/pinecilTime`](https://tangled.org/@dunkirk.sh/pinecilTime)
+The canonical repo for this is hosted on tangled over at [`dunkirk.sh/tinkcil`](https://tangled.org/@dunkirk.sh/tinkcil)
 
 <p align="center">
     <img src="https://raw.githubusercontent.com/taciturnaxolotl/carriage/main/.github/images/line-break.svg" />
@@ -13,5 +13,5 @@ The canonical repo for this is hosted on tangled over at [`dunkirk.sh/pinecilTim
 </p>
 
 <p align="center">
-    <a href="https://tangled.org/dunkirk.sh/pinecilTime/blob/main/LICENSE.md"><img src="https://img.shields.io/static/v1.svg?style=for-the-badge&label=License&message=O'Saasy&logoColor=d9e0ee&colorA=363a4f&colorB=b7bdf8"/></a>
+    <a href="https://tangled.org/dunkirk.sh/tinkcil/blob/main/LICENSE.md"><img src="https://img.shields.io/static/v1.svg?style=for-the-badge&label=License&message=O'Saasy&logoColor=d9e0ee&colorA=363a4f&colorB=b7bdf8"/></a>
 </p>

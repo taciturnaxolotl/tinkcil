@@ -1,12 +1,12 @@
 //
-//  Pinecil_TimeApp.swift
-//  PinecilTime
+//  TinkCil_App.swift
+//  TinkCil
 //
 
 import SwiftUI
 
 @main
-struct PinecilTimeApp: App {
+struct TinkCilApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  PinecilTime
+//  TinkCil
 //
 
 import SwiftUI
@@ -420,7 +420,7 @@ struct ContentView: View {
                     Text(bleManager.connectionState.isConnecting ? "Connecting..." : "Scanning...")
                         .font(isIPad ? .largeTitle : .headline)
 
-                    Text("Looking for your Pinecil")
+                    Text("Looking for your Tinkcil")
                         .font(isIPad ? .title3 : .subheadline)
                         .foregroundStyle(.secondary)
                 } else {

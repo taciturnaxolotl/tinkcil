@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  PinecilTime
+//  TinkCil
 //
 
 import SwiftUI

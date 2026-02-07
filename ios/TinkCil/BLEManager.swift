@@ -1,6 +1,6 @@
 //
 //  BLEManager.swift
-//  PinecilTime
+//  TinkCil
 //
 
 import CoreBluetooth
@@ -37,9 +37,9 @@ class BLEManager: NSObject {
     private var discoveredCharacteristics: [CBUUID: CBCharacteristic] = [:]
     private var pollTimer: Timer?
     private var scanTimer: Timer?
-    private let bleQueue = DispatchQueue(label: "com.pineciltime.ble", qos: .userInitiated)
+    private let bleQueue = DispatchQueue(label: "sh.dunkirk.tinkcil.ble", qos: .userInitiated)
     private let timerQueue = DispatchQueue.main
-    private let operationQueue = DispatchQueue(label: "com.pineciltime.operations", qos: .userInitiated)
+    private let operationQueue = DispatchQueue(label: "sh.dunkirk.tinkcil.operations", qos: .userInitiated)
     private var pendingWrites: [CBUUID: UInt16] = [:]
     private var settingReadCompletions: [CBUUID: (UInt16?) -> Void] = [:]
     private var operationTimeouts: [CBUUID: DispatchWorkItem] = [:]
@@ -398,9 +398,9 @@ extension BLEManager: CBCentralManagerDelegate {
                         rssi RSSI: NSNumber) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            // Auto-connect to first discovered Pinecil
+            // Auto-connect to first discovered Tinkcil
             if self.connectedPeripheral == nil {
-                // Match either Pinecil-* or by the advertised service UUID
+                // Match either Pinecil-* (legacy) or by the advertised service UUID
                 if peripheral.name?.hasPrefix("Pinecil-") == true ||
                    peripheral.name?.hasPrefix("PrattlePin-") == true ||
                    (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID])?.contains(IronOSUUIDs.bulkDataService) == true {
@@ -419,7 +419,7 @@ extension BLEManager: CBCentralManagerDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.connectionState = .connected
-            self.deviceName = peripheral.name ?? "Pinecil"
+            self.deviceName = peripheral.name ?? "Tinkcil"
         }
         peripheral.discoverServices(nil)
     }

@@ -1,6 +1,6 @@
 //
 //  Models.swift
-//  PinecilTime
+//  TinkCil
 //
 
 import CoreBluetooth
@@ -246,7 +246,7 @@ extension UInt16 {
 class SettingsCache {
     private(set) var cache: [UInt16: UInt16] = [:]
     private let userDefaults = UserDefaults.standard
-    private let cacheKey = "pinecilSettingsCache"
+    private let cacheKey = "tinkcilSettingsCache"
     
     init() {
         loadFromDisk()

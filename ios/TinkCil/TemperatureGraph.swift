@@ -1,6 +1,6 @@
 //
 //  TemperatureGraph.swift
-//  PinecilTime
+//  TinkCil
 //
 
 import Charts
