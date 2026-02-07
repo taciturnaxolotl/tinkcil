@@ -146,20 +146,20 @@ struct ContentView: View {
                     
                     VStack(spacing: 8) {
                         HStack {
-                            detailItem(label: "Handle", value: String(format: "%.1f°C", bleManager.liveData.handleTempC))
+                            detailItem(label: "Handle", value: String(format: "%.1f°C", bleManager.liveData.handleTempC), alignment: .leading)
                             Spacer()
-                            detailItem(label: "Tip Resistance", value: String(format: "%.2f Ω", bleManager.liveData.resistance))
+                            detailItem(label: "Tip Resistance", value: String(format: "%.2f Ω", bleManager.liveData.resistance), alignment: .trailing)
                         }
                         
                         HStack {
-                            detailItem(label: "Mode", value: bleManager.liveData.mode?.displayName ?? "Unknown")
+                            detailItem(label: "Mode", value: bleManager.liveData.mode?.displayName ?? "Unknown", alignment: .leading)
                             Spacer()
-                            detailItem(label: "Power", value: bleManager.liveData.power?.displayName ?? "Unknown")
+                            detailItem(label: "Power", value: bleManager.liveData.power?.displayName ?? "Unknown", alignment: .trailing)
                         }
                         
                         if !bleManager.firmwareVersion.isEmpty {
                             HStack {
-                                detailItem(label: "Firmware", value: bleManager.firmwareVersion)
+                                detailItem(label: "Firmware", value: bleManager.firmwareVersion, alignment: .leading)
                                 Spacer()
                             }
                         }
@@ -274,8 +274,8 @@ struct ContentView: View {
         .fixedSize()
     }
     
-    private func detailItem(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func detailItem(label: String, value: String, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 2) {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
