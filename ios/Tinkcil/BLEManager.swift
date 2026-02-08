@@ -23,7 +23,7 @@ class BLEManager: NSObject {
     var isDemoMode = false
 
     // Temperature history for graph (circular buffer)
-    var temperatureHistory = CircularBuffer<TemperaturePoint>(capacity: 60)
+    var temperatureHistory = CircularBuffer<TemperaturePoint>(capacity: 150)
     var temperatureHistoryArray: [TemperaturePoint] { temperatureHistory.elements }
     
     // Settings cache

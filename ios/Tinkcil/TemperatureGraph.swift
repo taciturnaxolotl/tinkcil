@@ -16,6 +16,10 @@ private struct ChartDataPoint: Identifiable {
 struct TemperatureGraph: View {
     let history: [TemperaturePoint]
     let currentSetpoint: Int
+    var windowSeconds: TimeInterval = 6
+    var showAxes: Bool = false
+    var tempLineWidth: CGFloat = 2.5
+    var setpointLineWidth: CGFloat = 1.5
 
     private var chartData: [ChartDataPoint] {
         var data: [ChartDataPoint] = []
@@ -89,7 +93,6 @@ struct TemperatureGraph: View {
     var body: some View {
         TimelineView(.animation(paused: false)) { timeline in
             let now = timeline.date
-            let windowSeconds: TimeInterval = 6
             let xDomain = now.addingTimeInterval(-windowSeconds)...now.addingTimeInterval(1)
 
             Chart(chartDataWithEdge(now: now, windowSeconds: windowSeconds)) { point in
@@ -99,14 +102,14 @@ struct TemperatureGraph: View {
                     series: .value("Series", point.series)
                 )
                 .foregroundStyle(point.series == "Setpoint" ? Color.gray.opacity(0.4) : lineColor)
-                .lineStyle(StrokeStyle(lineWidth: point.series == "Setpoint" ? 1.5 : 2.5, lineCap: .round))
+                .lineStyle(StrokeStyle(lineWidth: point.series == "Setpoint" ? setpointLineWidth : tempLineWidth, lineCap: .round))
             }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
+            .chartXAxis(showAxes ? .automatic : .hidden)
+            .chartYAxis(showAxes ? .automatic : .hidden)
             .chartLegend(.hidden)
             .chartYScale(domain: 0...500)
             .chartXScale(domain: xDomain)
-            .padding(.horizontal, -20)
+            .padding(.horizontal, showAxes ? 0 : -20)
         }
     }
 }

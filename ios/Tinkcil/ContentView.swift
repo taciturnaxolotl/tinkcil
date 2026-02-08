@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var bleManager = BLEManager()
     @State private var targetTemp: Double = 300
     @State private var isEditingSlider = false
@@ -13,34 +14,29 @@ struct ContentView: View {
     @State private var lastSendTime: Date = .distantPast
     @State private var isTopBarExpanded = false
     @State private var showingSettings = false
+    @State private var showingSettingsPanel = false
     @State private var showingError = false
     @State private var lastConnectionState: BLEManager.ConnectionState = .disconnected
     @State private var lastMode: OperatingMode?
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     private var isHeating: Bool {
         bleManager.liveData.mode?.isActive == true
     }
 
     var body: some View {
-        ZStack {
-            // Background graph
-            if bleManager.temperatureHistory.count > 0 {
-                TemperatureGraph(
-                    history: bleManager.temperatureHistoryArray,
-                    currentSetpoint: Int(targetTemp)
-                )
-                .padding(.horizontal, 20)
-                .padding(.vertical, 120)
-                .accessibilityLabel("Temperature history graph")
-                .accessibilityHint("Visual representation of temperature over time")
+        GeometryReader { geo in
+            Group {
+                if isRegularWidth && geo.size.width > geo.size.height {
+                    iPadBody
+                } else {
+                    iPhoneBody
+                }
             }
-
-            // Main content
-            if bleManager.connectionState.isConnected {
-                connectedView
-            } else {
-                scanningView
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(.systemBackground))
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
@@ -60,7 +56,7 @@ struct ContentView: View {
         }
         .onChange(of: bleManager.lastError) { _, error in
             if error != nil {
-                hapticError()
+                Haptics.error()
                 showingError = true
             }
         }
@@ -73,7 +69,42 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Connected View
+    // MARK: - iPhone Body
+
+    private var iPhoneBody: some View {
+        ZStack {
+            if bleManager.temperatureHistory.count > 0 {
+                TemperatureGraph(
+                    history: bleManager.temperatureHistoryArray,
+                    currentSetpoint: Int(targetTemp)
+                )
+                .padding(.horizontal, 20)
+                .padding(.vertical, 120)
+                .accessibilityLabel("Temperature history graph")
+                .accessibilityHint("Visual representation of temperature over time")
+            }
+
+            if bleManager.connectionState.isConnected {
+                connectedView
+            } else {
+                scanningView
+            }
+        }
+    }
+
+    // MARK: - iPad Body
+
+    private var iPadBody: some View {
+        ZStack {
+            if bleManager.connectionState.isConnected {
+                connectedViewRegular
+            } else {
+                scanningView
+            }
+        }
+    }
+
+    // MARK: - Connected View (iPhone)
 
     private var connectedView: some View {
         VStack(spacing: 0) {
@@ -115,7 +146,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // Main top bar (always visible)
             Button {
-                hapticLight()
+                Haptics.light()
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isTopBarExpanded.toggle()
                 }
@@ -177,32 +208,13 @@ struct ContentView: View {
                     Divider()
                         .padding(.horizontal, 20)
                     
-                    VStack(spacing: 8) {
-                        HStack {
-                            detailItem(label: String(localized: "detail_handle"), value: String(format: "%.1f°C", bleManager.liveData.handleTempC), alignment: .leading)
-                            Spacer()
-                            detailItem(label: String(localized: "detail_tip_resistance"), value: String(format: "%.2f Ω", bleManager.liveData.resistance), alignment: .trailing)
-                        }
-
-                        HStack {
-                            detailItem(label: String(localized: "detail_mode"), value: bleManager.liveData.mode?.displayName ?? String(localized: "common_unknown"), alignment: .leading)
-                            Spacer()
-                            detailItem(label: String(localized: "detail_power"), value: bleManager.liveData.power?.displayName ?? String(localized: "common_unknown"), alignment: .trailing)
-                        }
-
-                        if !bleManager.firmwareVersion.isEmpty {
-                            HStack {
-                                detailItem(label: String(localized: "detail_firmware"), value: bleManager.firmwareVersion, alignment: .leading)
-                                Spacer()
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
+                    deviceDetailStats
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
                     
                     // Settings button
                     Button {
-                        hapticLight()
+                        Haptics.light()
                         showingSettings = true
                     } label: {
                         HStack {
@@ -276,12 +288,12 @@ struct ContentView: View {
                 onEditingChanged: { editing in
                     isEditingSlider = editing
                     if editing {
-                        hapticSelection()
+                        Haptics.selection()
                         bleManager.setSlowPolling()
                     } else {
                         // Only send if value changed
                         if abs(targetTemp - lastSentTemp) >= 5 {
-                            hapticLight()
+                            Haptics.light()
                             bleManager.setTemperature(UInt32(targetTemp))
                             lastSentTemp = targetTemp
                         }
@@ -298,6 +310,31 @@ struct ContentView: View {
         .padding(.vertical, 14)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .contain)
+    }
+
+    // MARK: - Device Detail Stats
+
+    private var deviceDetailStats: some View {
+        VStack(spacing: 8) {
+            HStack {
+                detailItem(label: String(localized: "detail_handle"), value: String(format: "%.1f°C", bleManager.liveData.handleTempC), alignment: .leading)
+                Spacer()
+                detailItem(label: String(localized: "detail_tip_resistance"), value: String(format: "%.2f Ω", bleManager.liveData.resistance), alignment: .trailing)
+            }
+
+            HStack {
+                detailItem(label: String(localized: "detail_mode"), value: bleManager.liveData.mode?.displayName ?? String(localized: "common_unknown"), alignment: .leading)
+                Spacer()
+                detailItem(label: String(localized: "detail_power"), value: bleManager.liveData.power?.displayName ?? String(localized: "common_unknown"), alignment: .trailing)
+            }
+
+            if !bleManager.firmwareVersion.isEmpty {
+                HStack {
+                    detailItem(label: String(localized: "detail_firmware"), value: bleManager.firmwareVersion, alignment: .leading)
+                    Spacer()
+                }
+            }
+        }
     }
 
     // MARK: - Helpers
@@ -384,7 +421,7 @@ struct ContentView: View {
                         .accessibilityAddTraits(.isHeader)
 
                     Button(String(localized: "connection_scan_again")) {
-                        hapticLight()
+                        Haptics.light()
                         bleManager.startScanning()
                     }
                     .buttonStyle(.borderedProminent)
@@ -392,7 +429,7 @@ struct ContentView: View {
                     .accessibilityHint("Searches for nearby soldering iron")
 
                     Button("Try Demo") {
-                        hapticLight()
+                        Haptics.light()
                         bleManager.startDemoMode()
                     }
                     .font(.subheadline)
@@ -408,43 +445,138 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Haptic Feedback
+    // MARK: - iPad Connected View
 
-    private func hapticLight() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+    private var connectedViewRegular: some View {
+        HStack(spacing: 0) {
+            // Left: large graph
+            graphPanel
+                .frame(maxWidth: .infinity)
+
+            Color(.separator)
+                .frame(width: 2)
+                .ignoresSafeArea(.all)
+
+            // Right: controls
+            controlPanel
+                .frame(width: 420)
+                .background(.ultraThinMaterial)
+
+            // Settings panel (slides in from right)
+            if showingSettingsPanel {
+                Color(.separator)
+                    .frame(width: 2)
+                    .ignoresSafeArea(.all)
+
+                SettingsPanelView(bleManager: bleManager) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        showingSettingsPanel = false
+                    }
+                }
+                .transition(.move(edge: .trailing))
+            }
+        }
     }
 
-    private func hapticSelection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
+    private var graphPanel: some View {
+        Group {
+            if bleManager.temperatureHistory.count > 0 {
+                TemperatureGraph(
+                    history: bleManager.temperatureHistoryArray,
+                    currentSetpoint: Int(targetTemp),
+                    windowSeconds: 15,
+                    showAxes: true,
+                    tempLineWidth: 3,
+                    setpointLineWidth: 2
+                )
+                .padding(20)
+            } else {
+                ContentUnavailableView {
+                    Label("No Data", systemImage: "chart.xyaxis.line")
+                } description: {
+                    Text("Temperature data will appear here")
+                }
+            }
+        }
     }
 
-    private func hapticSuccess() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+    private var iPadDeviceHeader: some View {
+        HStack(spacing: 16) {
+            Text(bleManager.deviceName)
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 12) {
+                statItem(value: String(format: "%.1f", bleManager.liveData.watts), unit: "W")
+                statItem(value: String(format: "%.1f", bleManager.liveData.voltage), unit: "V")
+                statItem(value: "\(bleManager.liveData.powerPercent)", unit: "%")
+            }
+
+            if let mode = bleManager.liveData.mode {
+                Image(systemName: mode.icon)
+                    .font(.caption)
+                    .foregroundStyle(mode.isActive ? .orange : .secondary)
+            }
+
+            Button {
+                Haptics.light()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    showingSettingsPanel.toggle()
+                }
+            } label: {
+                Image(systemName: "gear")
+                    .font(.body)
+                    .foregroundStyle(showingSettingsPanel ? Color.accentColor : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Settings")
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
     }
 
-    private func hapticWarning() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
-    }
+    private var controlPanel: some View {
+        VStack(spacing: 0) {
+            iPadDeviceHeader
 
-    private func hapticError() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.error)
+            ScrollView {
+                VStack(spacing: 16) {
+                    deviceDetailStats
+                        .padding(.top, 12)
+
+                    temperatureDisplay
+
+                    if isHeating {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                            Text("\(bleManager.liveData.setpoint)°")
+                                .font(.title3.monospacedDigit())
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+
+                    sliderPanel
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+        }
     }
 
     private func handleConnectionStateChange(from oldState: BLEManager.ConnectionState, to newState: BLEManager.ConnectionState) {
         switch newState {
         case .connected:
-            hapticSuccess()
+            Haptics.success()
         case .disconnected:
             if oldState.isConnected {
-                hapticWarning()
+                Haptics.warning()
             }
         case .scanning:
-            hapticLight()
+            Haptics.light()
         default:
             break
         }
@@ -456,7 +588,7 @@ struct ContentView: View {
 
         // Haptic for entering/exiting active heating modes
         if old.isActive != new.isActive {
-            hapticLight()
+            Haptics.light()
         }
     }
 
@@ -470,7 +602,7 @@ struct ContentView: View {
 
         // Trigger success haptic when we reach target for the first time
         if wasBelow && isNear {
-            hapticSuccess()
+            Haptics.success()
         }
     }
 }

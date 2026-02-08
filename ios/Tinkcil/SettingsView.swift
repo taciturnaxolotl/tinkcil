@@ -31,17 +31,12 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(String(localized: "button_done")) {
-                        hapticLight()
+                        Haptics.light()
                         dismiss()
                     }
                 }
             }
         }
-    }
-
-    private func hapticLight() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
     }
 }
 
@@ -308,27 +303,17 @@ struct ConfigurationView: View {
 
     private func saveSettings() {
         saveInProgress = true
-        hapticLight()
+        Haptics.light()
         bleManager.saveSettings()
 
         // Wait for a reasonable time for the write operation
         Task {
             try? await Task.sleep(for: .milliseconds(500))
             await MainActor.run {
-                hapticSuccess()
+                Haptics.success()
                 saveInProgress = false
             }
         }
-    }
-
-    private func hapticLight() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-    }
-
-    private func hapticSuccess() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
     }
 
     private func loadSettings() async {
@@ -409,7 +394,7 @@ struct DiagnosticsView: View {
             
             Section {
                 Button(role: .destructive) {
-                    hapticWarning()
+                    Haptics.warning()
                     bleManager.disconnect()
                 } label: {
                     HStack {
@@ -453,10 +438,6 @@ struct DiagnosticsView: View {
         }
     }
 
-    private func hapticWarning() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
-    }
 }
 
 // MARK: - Setting Row Components
@@ -489,9 +470,9 @@ struct SettingRow: View {
                 step: Double(step),
                 onEditingChanged: { editing in
                     if editing {
-                        hapticSelection()
+                        Haptics.selection()
                     } else {
-                        hapticLight()
+                        Haptics.light()
                         onChange(value)
                     }
                 }
@@ -501,16 +482,6 @@ struct SettingRow: View {
             .accessibilityHint("Adjust using the slider. Range is \(range.lowerBound) to \(range.upperBound) \(unit)")
         }
         .accessibilityElement(children: .contain)
-    }
-
-    private func hapticLight() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-    }
-
-    private func hapticSelection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
     }
 }
 
@@ -523,7 +494,7 @@ struct ToggleSettingRow: View {
         Toggle(label, isOn: Binding(
             get: { value },
             set: { newValue in
-                hapticLight()
+                Haptics.light()
                 value = newValue
                 onChange(newValue)
             }
@@ -531,11 +502,6 @@ struct ToggleSettingRow: View {
         .accessibilityLabel(label)
         .accessibilityValue(value ? "On" : "Off")
         .accessibilityHint("Double tap to toggle")
-    }
-
-    private func hapticLight() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
     }
 }
 
@@ -549,7 +515,7 @@ struct PickerSettingRow: View {
         Picker(label, selection: Binding(
             get: { value },
             set: { newValue in
-                hapticSelection()
+                Haptics.selection()
                 value = newValue
                 onChange(newValue)
             }
@@ -562,10 +528,56 @@ struct PickerSettingRow: View {
         .accessibilityValue(options.first(where: { $0.0 == value })?.1 ?? "")
         .accessibilityHint("Select an option from the list")
     }
+}
 
-    private func hapticSelection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
+// MARK: - iPad Settings Panel
+
+struct SettingsPanelView: View {
+    let bleManager: BLEManager
+    let onClose: () -> Void
+    @State private var selectedTab = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text(selectedTab == 0 ? String(localized: "settings_tab") : String(localized: "device_info_title"))
+                    .font(.headline)
+                Spacer()
+                Button {
+                    Haptics.light()
+                    onClose()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close settings")
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            // Segmented picker
+            Picker("", selection: $selectedTab) {
+                Text(String(localized: "settings_tab")).tag(0)
+                Text(String(localized: "info_tab")).tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+
+            // Content
+            if selectedTab == 0 {
+                ConfigurationView(bleManager: bleManager)
+            } else {
+                DiagnosticsView(bleManager: bleManager)
+            }
+        }
+        .frame(width: 380)
+        .background(.ultraThinMaterial)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 }
 
