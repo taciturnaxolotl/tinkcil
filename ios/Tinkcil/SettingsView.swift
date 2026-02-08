@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  TinkCil
+//  Tinkcil
 //
 
 import SwiftUI

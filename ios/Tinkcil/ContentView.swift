@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  TinkCil
+//  Tinkcil
 //
 
 import SwiftUI

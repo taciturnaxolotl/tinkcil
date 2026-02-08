@@ -1,6 +1,6 @@
 //
 //  IronOSUUIDs.swift
-//  TinkCil
+//  Tinkcil
 //
 
 import CoreBluetooth

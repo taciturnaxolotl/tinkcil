@@ -1,12 +1,12 @@
 //
-//  TinkCil_App.swift
-//  TinkCil
+//  Tinkcil_App.swift
+//  Tinkcil
 //
 
 import SwiftUI
 
 @main
-struct TinkCilApp: App {
+struct TinkciApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

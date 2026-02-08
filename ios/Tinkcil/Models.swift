@@ -1,6 +1,6 @@
 //
 //  Models.swift
-//  TinkCil
+//  Tinkcil
 //
 
 import CoreBluetooth

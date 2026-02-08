@@ -1,6 +1,6 @@
 //
 //  TemperatureGraph.swift
-//  TinkCil
+//  Tinkcil
 //
 
 import Charts

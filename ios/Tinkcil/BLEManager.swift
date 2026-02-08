@@ -1,6 +1,6 @@
 //
 //  BLEManager.swift
-//  TinkCil
+//  Tinkcil
 //
 
 @preconcurrency import CoreBluetooth
@@ -511,10 +511,8 @@ extension BLEManager: CBPeripheralDelegate {
                 peripheral.readValue(for: characteristic)
             }
 
-            // Enable notifications for operating mode
-            if characteristic.uuid == IronOSUUIDs.operatingMode {
-                peripheral.setNotifyValue(true, for: characteristic)
-            }
+            // Note: Firmware does not support BLE notifications (no BT_GATT_CHRC_NOTIFY flag)
+            // All data must be polled - notification subscription would have no effect
             
             // Handle pending writes for dynamically discovered settings
             let pendingValue = operationQueue.sync { () -> UInt16? in
