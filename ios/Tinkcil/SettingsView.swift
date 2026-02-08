@@ -9,7 +9,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     let bleManager: BLEManager
     @State private var selectedTab = 0
-    
+
     var body: some View {
         NavigationStack {
             TabView(selection: $selectedTab) {
@@ -30,11 +30,17 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
+                        hapticLight()
                         dismiss()
                     }
                 }
             }
         }
+    }
+
+    private func hapticLight() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 }
 
@@ -298,15 +304,27 @@ struct ConfigurationView: View {
 
     private func saveSettings() {
         saveInProgress = true
+        hapticLight()
         bleManager.saveSettings()
 
         // Wait for a reasonable time for the write operation
         Task {
             try? await Task.sleep(for: .milliseconds(500))
             await MainActor.run {
+                hapticSuccess()
                 saveInProgress = false
             }
         }
+    }
+
+    private func hapticLight() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+
+    private func hapticSuccess() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
     }
 
     private func loadSettings() async {
@@ -387,6 +405,7 @@ struct DiagnosticsView: View {
             
             Section {
                 Button(role: .destructive) {
+                    hapticWarning()
                     bleManager.disconnect()
                 } label: {
                     HStack {
@@ -427,6 +446,11 @@ struct DiagnosticsView: View {
             return "\(hours)h \(minutes)m ago"
         }
     }
+
+    private func hapticWarning() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.warning)
+    }
 }
 
 // MARK: - Setting Row Components
@@ -438,7 +462,7 @@ struct SettingRow: View {
     let step: UInt16
     let unit: String
     let onChange: (UInt16) -> Void
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -448,7 +472,7 @@ struct SettingRow: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-            
+
             Slider(
                 value: Binding(
                     get: { Double(value) },
@@ -457,12 +481,25 @@ struct SettingRow: View {
                 in: Double(range.lowerBound)...Double(range.upperBound),
                 step: Double(step),
                 onEditingChanged: { editing in
-                    if !editing {
+                    if editing {
+                        hapticSelection()
+                    } else {
+                        hapticLight()
                         onChange(value)
                     }
                 }
             )
         }
+    }
+
+    private func hapticLight() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+
+    private func hapticSelection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
     }
 }
 
@@ -470,15 +507,21 @@ struct ToggleSettingRow: View {
     let label: String
     @Binding var value: Bool
     let onChange: (Bool) -> Void
-    
+
     var body: some View {
         Toggle(label, isOn: Binding(
             get: { value },
             set: { newValue in
+                hapticLight()
                 value = newValue
                 onChange(newValue)
             }
         ))
+    }
+
+    private func hapticLight() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 }
 
@@ -487,11 +530,12 @@ struct PickerSettingRow: View {
     @Binding var value: UInt16
     let options: [(UInt16, String)]
     let onChange: (UInt16) -> Void
-    
+
     var body: some View {
         Picker(label, selection: Binding(
             get: { value },
             set: { newValue in
+                hapticSelection()
                 value = newValue
                 onChange(newValue)
             }
@@ -500,6 +544,11 @@ struct PickerSettingRow: View {
                 Text(option.1).tag(option.0)
             }
         }
+    }
+
+    private func hapticSelection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
     }
 }
 

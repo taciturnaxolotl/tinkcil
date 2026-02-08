@@ -14,6 +14,8 @@ struct ContentView: View {
     @State private var isTopBarExpanded = false
     @State private var showingSettings = false
     @State private var showingError = false
+    @State private var lastConnectionState: BLEManager.ConnectionState = .disconnected
+    @State private var lastMode: OperatingMode?
 
     private var isHeating: Bool {
         bleManager.liveData.mode?.isActive == true
@@ -44,8 +46,18 @@ struct ContentView: View {
                 targetTemp = Double(newValue)
             }
         }
+        .onChange(of: bleManager.connectionState) { oldState, newState in
+            handleConnectionStateChange(from: oldState, to: newState)
+        }
+        .onChange(of: bleManager.liveData.mode) { oldMode, newMode in
+            handleModeChange(from: oldMode, to: newMode)
+        }
+        .onChange(of: bleManager.liveData.liveTemp) { oldTemp, newTemp in
+            checkTemperatureReached(oldTemp: oldTemp, newTemp: newTemp)
+        }
         .onChange(of: bleManager.lastError) { _, error in
             if error != nil {
+                hapticError()
                 showingError = true
             }
         }
@@ -98,6 +110,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // Main top bar (always visible)
             Button {
+                hapticLight()
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isTopBarExpanded.toggle()
                 }
@@ -170,6 +183,7 @@ struct ContentView: View {
                     
                     // Settings button
                     Button {
+                        hapticLight()
                         showingSettings = true
                     } label: {
                         HStack {
@@ -236,10 +250,12 @@ struct ContentView: View {
                 onEditingChanged: { editing in
                     isEditingSlider = editing
                     if editing {
+                        hapticSelection()
                         bleManager.setSlowPolling()
                     } else {
                         // Only send if value changed
                         if abs(targetTemp - lastSentTemp) >= 5 {
+                            hapticLight()
                             bleManager.setTemperature(UInt32(targetTemp))
                             lastSentTemp = targetTemp
                         }
@@ -323,7 +339,7 @@ struct ContentView: View {
                     Text(bleManager.connectionState.isConnecting ? "Connecting..." : "Scanning...")
                         .font(.headline)
 
-                    Text("Looking for your Tinkcil")
+                    Text("Looking for your iron")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
@@ -336,6 +352,7 @@ struct ContentView: View {
                         .font(.headline)
 
                     Button("Scan Again") {
+                        hapticLight()
                         bleManager.startScanning()
                     }
                     .buttonStyle(.borderedProminent)
@@ -344,6 +361,72 @@ struct ContentView: View {
             .padding(32)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
             .shadow(color: .black.opacity(0.2), radius: 20)
+        }
+    }
+
+    // MARK: - Haptic Feedback
+
+    private func hapticLight() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+
+    private func hapticSelection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
+    }
+
+    private func hapticSuccess() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
+
+    private func hapticWarning() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.warning)
+    }
+
+    private func hapticError() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.error)
+    }
+
+    private func handleConnectionStateChange(from oldState: BLEManager.ConnectionState, to newState: BLEManager.ConnectionState) {
+        switch newState {
+        case .connected:
+            hapticSuccess()
+        case .disconnected:
+            if oldState.isConnected {
+                hapticWarning()
+            }
+        case .scanning:
+            hapticLight()
+        default:
+            break
+        }
+    }
+
+    private func handleModeChange(from oldMode: OperatingMode?, to newMode: OperatingMode?) {
+        // Only trigger haptic if mode actually changed and it's a meaningful change
+        guard let old = oldMode, let new = newMode, old != new else { return }
+
+        // Haptic for entering/exiting active heating modes
+        if old.isActive != new.isActive {
+            hapticLight()
+        }
+    }
+
+    private func checkTemperatureReached(oldTemp: UInt32, newTemp: UInt32) {
+        // Check if we just reached the target temperature (within 5 degrees)
+        let target = bleManager.liveData.setpoint
+        guard target > 0 && isHeating else { return }
+
+        let wasBelow = oldTemp < target - 5
+        let isNear = abs(Int(newTemp) - Int(target)) <= 5
+
+        // Trigger success haptic when we reach target for the first time
+        if wasBelow && isNear {
+            hapticSuccess()
         }
     }
 }
