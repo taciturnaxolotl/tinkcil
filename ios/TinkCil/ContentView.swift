@@ -14,20 +14,15 @@ struct ContentView: View {
     @State private var isTopBarExpanded = false
     @State private var showingSettings = false
     @State private var showingError = false
-    @Environment(\.horizontalSizeClass) var horizontalSizeClass
 
     private var isHeating: Bool {
         bleManager.liveData.mode?.isActive == true
     }
 
-    private var isIPad: Bool {
-        horizontalSizeClass == .regular
-    }
-
     var body: some View {
         ZStack {
-            // Background graph (only show on iPhone)
-            if !isIPad && bleManager.temperatureHistory.count > 0 {
+            // Background graph
+            if bleManager.temperatureHistory.count > 0 {
                 TemperatureGraph(
                     history: bleManager.temperatureHistoryArray,
                     currentSetpoint: Int(targetTemp)
@@ -38,11 +33,7 @@ struct ContentView: View {
 
             // Main content
             if bleManager.connectionState.isConnected {
-                if isIPad {
-                    connectedViewIPad
-                } else {
-                    connectedView
-                }
+                connectedView
             } else {
                 scanningView
             }
@@ -98,68 +89,6 @@ struct ContentView: View {
             sliderPanel
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
-        }
-    }
-
-    // MARK: - Connected View iPad
-
-    private var connectedViewIPad: some View {
-        GeometryReader { geometry in
-            HStack(spacing: 0) {
-                // Left side: Temperature Graph
-                if bleManager.temperatureHistory.count > 0 {
-                    TemperatureGraph(
-                        history: bleManager.temperatureHistoryArray,
-                        currentSetpoint: Int(targetTemp)
-                    )
-                    .frame(width: geometry.size.width * 0.55)
-                    .padding(32)
-                } else {
-                    // Placeholder when no data
-                    VStack {
-                        Image(systemName: "chart.line.uptrend.xyaxis")
-                            .font(.system(size: 60))
-                            .foregroundStyle(.tertiary)
-                        Text("No temperature history yet")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(width: geometry.size.width * 0.55)
-                }
-
-                // Right side: Controls and Stats
-                VStack(spacing: 0) {
-                    // Top bar with stats
-                    topBar
-                        .padding(.top, 32)
-
-                    Spacer()
-
-                    // Big temperature number
-                    VStack(spacing: 12) {
-                        temperatureDisplay
-
-                        // Target indicator
-                        if isHeating {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.right")
-                                    .font(.body)
-                                Text("\(bleManager.liveData.setpoint)°")
-                                    .font(.title2.monospacedDigit())
-                            }
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
-
-                    // Slider panel
-                    sliderPanel
-                        .padding(.horizontal, 32)
-                        .padding(.bottom, 32)
-                }
-                .frame(width: geometry.size.width * 0.45)
-            }
         }
     }
 
@@ -271,15 +200,13 @@ struct ContentView: View {
     private var temperatureDisplay: some View {
         let currentTemp = Double(bleManager.liveData.liveTemp)
         let maxTemp = Double(bleManager.liveData.maxTemp)
-        let fontSize: CGFloat = isIPad ? 160 : 120
-        let degreeSize: CGFloat = isIPad ? 80 : 60
 
         return HStack(alignment: .firstTextBaseline, spacing: 0) {
             Text("\(bleManager.liveData.liveTemp)")
-                .font(.system(size: fontSize, weight: .thin, design: .rounded))
+                .font(.system(size: 120, weight: .thin, design: .rounded))
                 .contentTransition(.numericText())
             Text("°")
-                .font(.system(size: degreeSize, weight: .ultraLight))
+                .font(.system(size: 60, weight: .ultraLight))
                 .foregroundStyle(.secondary)
         }
         .foregroundStyle(colorForTemp(currentTemp, maxTemp: maxTemp))
@@ -288,68 +215,44 @@ struct ContentView: View {
     // MARK: - Slider Panel
 
     private var sliderPanel: some View {
-        VStack(spacing: isIPad ? 20 : 0) {
-            // iPad: Show label above slider
-            if isIPad {
-                HStack {
-                    Text("Target Temperature")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    // Target temperature display
-                    HStack(alignment: .firstTextBaseline, spacing: 1) {
-                        Text("\(Int(targetTemp))")
-                            .font(.system(size: 32, weight: .semibold, design: .rounded))
-                            .contentTransition(.numericText())
-                        Text("°")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(.secondary)
-                    }
-                    .foregroundStyle(colorForTemp(targetTemp, maxTemp: 450))
-                }
+        HStack(spacing: 16) {
+            // Target temperature display
+            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                Text("\(Int(targetTemp))")
+                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+                    .contentTransition(.numericText())
+                Text("°")
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(.secondary)
             }
+            .foregroundStyle(colorForTemp(targetTemp, maxTemp: 450))
+            .frame(width: 60)
 
-            HStack(spacing: 16) {
-                // iPhone: Target temperature display on the side
-                if !isIPad {
-                    HStack(alignment: .firstTextBaseline, spacing: 1) {
-                        Text("\(Int(targetTemp))")
-                            .font(.system(size: 24, weight: .semibold, design: .rounded))
-                            .contentTransition(.numericText())
-                        Text("°")
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundStyle(.secondary)
-                    }
-                    .foregroundStyle(colorForTemp(targetTemp, maxTemp: 450))
-                    .frame(width: 60)
-                }
-
-                // Slider
-                Slider(
-                    value: $targetTemp,
-                    in: 10...450,
-                    step: 5,
-                    onEditingChanged: { editing in
-                        isEditingSlider = editing
-                        if editing {
-                            bleManager.setSlowPolling()
-                        } else {
-                            // Only send if value changed
-                            if abs(targetTemp - lastSentTemp) >= 5 {
-                                bleManager.setTemperature(UInt32(targetTemp))
-                                lastSentTemp = targetTemp
-                            }
-                            bleManager.setFastPolling()
+            // Slider
+            Slider(
+                value: $targetTemp,
+                in: 10...450,
+                step: 5,
+                onEditingChanged: { editing in
+                    isEditingSlider = editing
+                    if editing {
+                        bleManager.setSlowPolling()
+                    } else {
+                        // Only send if value changed
+                        if abs(targetTemp - lastSentTemp) >= 5 {
+                            bleManager.setTemperature(UInt32(targetTemp))
+                            lastSentTemp = targetTemp
                         }
+                        bleManager.setFastPolling()
                     }
-                )
-                .tint(colorForTemp(targetTemp, maxTemp: 450))
-                .accessibilityLabel("Target temperature")
-                .accessibilityValue("\(Int(targetTemp)) degrees")
-            }
+                }
+            )
+            .tint(colorForTemp(targetTemp, maxTemp: 450))
+            .accessibilityLabel("Target temperature")
+            .accessibilityValue("\(Int(targetTemp)) degrees")
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, isIPad ? 20 : 14)
+        .padding(.vertical, 14)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
@@ -411,36 +314,35 @@ struct ContentView: View {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
 
-            VStack(spacing: isIPad ? 28 : 20) {
+            VStack(spacing: 20) {
                 if bleManager.isScanning || bleManager.connectionState.isConnecting {
                     ProgressView()
-                        .scaleEffect(isIPad ? 2.0 : 1.2)
+                        .scaleEffect(1.2)
                         .padding(.bottom, 4)
 
                     Text(bleManager.connectionState.isConnecting ? "Connecting..." : "Scanning...")
-                        .font(isIPad ? .largeTitle : .headline)
+                        .font(.headline)
 
                     Text("Looking for your Tinkcil")
-                        .font(isIPad ? .title3 : .subheadline)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
                     Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                        .font(.system(size: isIPad ? 60 : 36))
+                        .font(.system(size: 36))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 4)
 
                     Text("No Device Found")
-                        .font(isIPad ? .largeTitle : .headline)
+                        .font(.headline)
 
                     Button("Scan Again") {
                         bleManager.startScanning()
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(isIPad ? .large : .regular)
                 }
             }
-            .padding(isIPad ? 48 : 32)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: isIPad ? 32 : 24))
+            .padding(32)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
             .shadow(color: .black.opacity(0.2), radius: 20)
         }
     }
