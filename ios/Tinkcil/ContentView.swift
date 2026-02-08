@@ -64,8 +64,8 @@ struct ContentView: View {
                 showingError = true
             }
         }
-        .alert("Bluetooth Error", isPresented: $showingError, presenting: bleManager.lastError) { _ in
-            Button("OK") {
+        .alert(String(localized: "bluetooth_error_title"), isPresented: $showingError, presenting: bleManager.lastError) { _ in
+            Button(String(localized: "button_ok")) {
                 bleManager.lastError = nil
             }
         } message: { error in
@@ -179,20 +179,20 @@ struct ContentView: View {
                     
                     VStack(spacing: 8) {
                         HStack {
-                            detailItem(label: "Handle", value: String(format: "%.1f°C", bleManager.liveData.handleTempC), alignment: .leading)
+                            detailItem(label: String(localized: "detail_handle"), value: String(format: "%.1f°C", bleManager.liveData.handleTempC), alignment: .leading)
                             Spacer()
-                            detailItem(label: "Tip Resistance", value: String(format: "%.2f Ω", bleManager.liveData.resistance), alignment: .trailing)
+                            detailItem(label: String(localized: "detail_tip_resistance"), value: String(format: "%.2f Ω", bleManager.liveData.resistance), alignment: .trailing)
                         }
-                        
+
                         HStack {
-                            detailItem(label: "Mode", value: bleManager.liveData.mode?.displayName ?? "Unknown", alignment: .leading)
+                            detailItem(label: String(localized: "detail_mode"), value: bleManager.liveData.mode?.displayName ?? String(localized: "common_unknown"), alignment: .leading)
                             Spacer()
-                            detailItem(label: "Power", value: bleManager.liveData.power?.displayName ?? "Unknown", alignment: .trailing)
+                            detailItem(label: String(localized: "detail_power"), value: bleManager.liveData.power?.displayName ?? String(localized: "common_unknown"), alignment: .trailing)
                         }
-                        
+
                         if !bleManager.firmwareVersion.isEmpty {
                             HStack {
-                                detailItem(label: "Firmware", value: bleManager.firmwareVersion, alignment: .leading)
+                                detailItem(label: String(localized: "detail_firmware"), value: bleManager.firmwareVersion, alignment: .leading)
                                 Spacer()
                             }
                         }
@@ -207,7 +207,7 @@ struct ContentView: View {
                     } label: {
                         HStack {
                             Image(systemName: "gear")
-                            Text("Settings & Info")
+                            Text(String(localized: "settings_button"))
                         }
                         .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity)
@@ -366,10 +366,10 @@ struct ContentView: View {
                         .padding(.bottom, 4)
                         .accessibilityLabel(bleManager.connectionState.isConnecting ? "Connecting to device" : "Scanning for device")
 
-                    Text(bleManager.connectionState.isConnecting ? "Connecting..." : "Scanning...")
+                    Text(bleManager.connectionState.isConnecting ? String(localized: "connection_connecting") : String(localized: "connection_scanning"))
                         .font(.headline)
 
-                    Text("Looking for your iron")
+                    Text(String(localized: "connection_looking_for_iron"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
@@ -379,11 +379,11 @@ struct ContentView: View {
                         .padding(.bottom, 4)
                         .accessibilityHidden(true)
 
-                    Text("No Device Found")
+                    Text(String(localized: "connection_no_device_found"))
                         .font(.headline)
                         .accessibilityAddTraits(.isHeader)
 
-                    Button("Scan Again") {
+                    Button(String(localized: "connection_scan_again")) {
                         hapticLight()
                         bleManager.startScanning()
                     }

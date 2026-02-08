@@ -15,22 +15,22 @@ struct SettingsView: View {
             TabView(selection: $selectedTab) {
                 ConfigurationView(bleManager: bleManager)
                     .tabItem {
-                        Label("Settings", systemImage: "slider.horizontal.3")
+                        Label(String(localized: "settings_tab"), systemImage: "slider.horizontal.3")
                     }
                     .tag(0)
 
                 DiagnosticsView(bleManager: bleManager)
                     .tabItem {
-                        Label("Info", systemImage: "info.circle")
+                        Label(String(localized: "info_tab"), systemImage: "info.circle")
                     }
                     .tag(1)
             }
-            .navigationTitle(selectedTab == 0 ? "Settings" : "Device Info")
+            .navigationTitle(selectedTab == 0 ? String(localized: "settings_tab") : String(localized: "device_info_title"))
             .navigationBarTitleDisplayMode(.inline)
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                    Button(String(localized: "button_done")) {
                         hapticLight()
                         dismiss()
                     }
@@ -55,9 +55,9 @@ struct ConfigurationView: View {
     
     var body: some View {
         List {
-            Section("Temperature") {
+            Section(String(localized: "section_temperature")) {
                 SettingRow(
-                    label: "Soldering Temp",
+                    label: String(localized: "setting_soldering_temp"),
                     value: Binding(
                         get: { settings[0] ?? 320 },
                         set: { settings[0] = $0 }
@@ -67,9 +67,9 @@ struct ConfigurationView: View {
                     unit: "°C",
                     onChange: { bleManager.writeSetting(index: 0, value: $0) }
                 )
-                
+
                 SettingRow(
-                    label: "Sleep Temp",
+                    label: String(localized: "setting_sleep_temp"),
                     value: Binding(
                         get: { settings[1] ?? 150 },
                         set: { settings[1] = $0 }
@@ -79,9 +79,9 @@ struct ConfigurationView: View {
                     unit: "°C",
                     onChange: { bleManager.writeSetting(index: 1, value: $0) }
                 )
-                
+
                 SettingRow(
-                    label: "Boost Temp",
+                    label: String(localized: "setting_boost_temp"),
                     value: Binding(
                         get: { settings[22] ?? 420 },
                         set: { settings[22] = $0 }
@@ -92,10 +92,10 @@ struct ConfigurationView: View {
                     onChange: { bleManager.writeSetting(index: 22, value: $0) }
                 )
             }
-            
-            Section("Timers") {
+
+            Section(String(localized: "section_timers")) {
                 SettingRow(
-                    label: "Sleep Time",
+                    label: String(localized: "setting_sleep_time"),
                     value: Binding(
                         get: { settings[2] ?? 1 },
                         set: { settings[2] = $0 }
@@ -105,9 +105,9 @@ struct ConfigurationView: View {
                     unit: "min",
                     onChange: { bleManager.writeSetting(index: 2, value: $0) }
                 )
-                
+
                 SettingRow(
-                    label: "Shutdown Time",
+                    label: String(localized: "setting_shutdown_time"),
                     value: Binding(
                         get: { settings[11] ?? 10 },
                         set: { settings[11] = $0 }
@@ -118,10 +118,10 @@ struct ConfigurationView: View {
                     onChange: { bleManager.writeSetting(index: 11, value: $0) }
                 )
             }
-            
-            Section("Power") {
+
+            Section(String(localized: "section_power")) {
                 SettingRow(
-                    label: "Power Limit",
+                    label: String(localized: "setting_power_limit"),
                     value: Binding(
                         get: { settings[24] ?? 65 },
                         set: { settings[24] = $0 }
@@ -132,24 +132,24 @@ struct ConfigurationView: View {
                     onChange: { bleManager.writeSetting(index: 24, value: $0) }
                 )
             }
-            
-            Section("Display") {
+
+            Section(String(localized: "section_display")) {
                 PickerSettingRow(
-                    label: "Orientation",
+                    label: String(localized: "setting_orientation"),
                     value: Binding(
                         get: { settings[6] ?? 2 },
                         set: { settings[6] = $0 }
                     ),
                     options: [
-                        (0, "Right"),
-                        (1, "Left"),
-                        (2, "Auto")
+                        (0, String(localized: "option_right")),
+                        (1, String(localized: "option_left")),
+                        (2, String(localized: "option_auto"))
                     ],
                     onChange: { bleManager.writeSetting(index: 6, value: $0) }
                 )
-                
+
                 SettingRow(
-                    label: "Brightness",
+                    label: String(localized: "setting_brightness"),
                     value: Binding(
                         get: { settings[34] ?? 51 },
                         set: { settings[34] = $0 }
@@ -159,27 +159,27 @@ struct ConfigurationView: View {
                     unit: "%",
                     onChange: { bleManager.writeSetting(index: 34, value: $0) }
                 )
-                
+
                 ToggleSettingRow(
-                    label: "Invert Display",
+                    label: String(localized: "setting_invert_display"),
                     value: Binding(
                         get: { settings[33] == 1 },
                         set: { settings[33] = $0 ? 1 : 0 }
                     ),
                     onChange: { bleManager.writeSetting(index: 33, value: $0 ? 1 : 0) }
                 )
-                
+
                 ToggleSettingRow(
-                    label: "Detailed Idle",
+                    label: String(localized: "setting_detailed_idle"),
                     value: Binding(
                         get: { settings[13] == 1 },
                         set: { settings[13] = $0 ? 1 : 0 }
                     ),
                     onChange: { bleManager.writeSetting(index: 13, value: $0 ? 1 : 0) }
                 )
-                
+
                 ToggleSettingRow(
-                    label: "Detailed Soldering",
+                    label: String(localized: "setting_detailed_soldering"),
                     value: Binding(
                         get: { settings[14] == 1 },
                         set: { settings[14] = $0 ? 1 : 0 }
@@ -187,10 +187,10 @@ struct ConfigurationView: View {
                     onChange: { bleManager.writeSetting(index: 14, value: $0 ? 1 : 0) }
                 )
             }
-            
-            Section("Sensors") {
+
+            Section(String(localized: "section_sensors")) {
                 SettingRow(
-                    label: "Motion Sensitivity",
+                    label: String(localized: "setting_motion_sensitivity"),
                     value: Binding(
                         get: { settings[7] ?? 6 },
                         set: { settings[7] = $0 }
@@ -200,9 +200,9 @@ struct ConfigurationView: View {
                     unit: "",
                     onChange: { bleManager.writeSetting(index: 7, value: $0) }
                 )
-                
+
                 SettingRow(
-                    label: "Hall Sensitivity",
+                    label: String(localized: "setting_hall_sensitivity"),
                     value: Binding(
                         get: { settings[28] ?? 7 },
                         set: { settings[28] = $0 }
@@ -213,33 +213,33 @@ struct ConfigurationView: View {
                     onChange: { bleManager.writeSetting(index: 28, value: $0) }
                 )
             }
-            
-            Section("Controls") {
+
+            Section(String(localized: "section_controls")) {
                 PickerSettingRow(
-                    label: "Locking Mode",
+                    label: String(localized: "setting_locking_mode"),
                     value: Binding(
                         get: { settings[17] ?? 0 },
                         set: { settings[17] = $0 }
                     ),
                     options: [
-                        (0, "Off"),
-                        (1, "Boost Only"),
-                        (2, "Full")
+                        (0, String(localized: "option_off")),
+                        (1, String(localized: "option_boost_only")),
+                        (2, String(localized: "option_full"))
                     ],
                     onChange: { bleManager.writeSetting(index: 17, value: $0) }
                 )
-                
+
                 ToggleSettingRow(
-                    label: "Reverse +/- Buttons",
+                    label: String(localized: "setting_reverse_buttons"),
                     value: Binding(
                         get: { settings[25] == 1 },
                         set: { settings[25] = $0 ? 1 : 0 }
                     ),
                     onChange: { bleManager.writeSetting(index: 25, value: $0 ? 1 : 0) }
                 )
-                
+
                 SettingRow(
-                    label: "Short Press Step",
+                    label: String(localized: "setting_short_press_step"),
                     value: Binding(
                         get: { settings[27] ?? 1 },
                         set: { settings[27] = $0 }
@@ -249,9 +249,9 @@ struct ConfigurationView: View {
                     unit: "°C",
                     onChange: { bleManager.writeSetting(index: 27, value: $0) }
                 )
-                
+
                 SettingRow(
-                    label: "Long Press Step",
+                    label: String(localized: "setting_long_press_step"),
                     value: Binding(
                         get: { settings[26] ?? 10 },
                         set: { settings[26] = $0 }
@@ -273,20 +273,20 @@ struct ConfigurationView: View {
                             ProgressView()
                                 .padding(.trailing, 8)
                         }
-                        Text("Save to Device")
+                        Text(String(localized: "button_save_to_device"))
                         Spacer()
                     }
                 }
                 .disabled(saveInProgress)
-                .accessibilityLabel(saveInProgress ? "Saving settings" : "Save settings to device")
+                .accessibilityLabel(saveInProgress ? String(localized: "saving_settings") : String(localized: "save_settings_hint"))
                 .accessibilityHint("Saves all settings to persist across device restarts")
             } footer: {
-                Text("Changes are written immediately but must be saved to persist across restarts.")
+                Text(String(localized: "settings_footer_message"))
             }
         }
         .overlay {
             if isLoading {
-                ProgressView("Loading settings...")
+                ProgressView(String(localized: "loading_settings"))
                     .padding()
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                     .accessibilityLabel("Loading device settings")
@@ -377,34 +377,34 @@ struct DiagnosticsView: View {
     
     var body: some View {
         List {
-            Section("Device Information") {
-                InfoRow(label: "Device Name", value: bleManager.deviceName)
-                InfoRow(label: "Firmware", value: bleManager.firmwareVersion.isEmpty ? "Unknown" : bleManager.firmwareVersion)
-                InfoRow(label: "Build ID", value: bleManager.buildID.isEmpty ? "Unknown" : bleManager.buildID)
-                InfoRow(label: "Serial Number", value: bleManager.deviceSerial.isEmpty ? "Unknown" : bleManager.deviceSerial)
+            Section(String(localized: "section_device_info")) {
+                InfoRow(label: String(localized: "info_device_name"), value: bleManager.deviceName)
+                InfoRow(label: String(localized: "info_firmware"), value: bleManager.firmwareVersion.isEmpty ? String(localized: "common_unknown") : bleManager.firmwareVersion)
+                InfoRow(label: String(localized: "info_build_id"), value: bleManager.buildID.isEmpty ? String(localized: "common_unknown") : bleManager.buildID)
+                InfoRow(label: String(localized: "info_serial_number"), value: bleManager.deviceSerial.isEmpty ? String(localized: "common_unknown") : bleManager.deviceSerial)
             }
-            
-            Section("Current Status") {
-                InfoRow(label: "Temperature", value: "\(bleManager.liveData.liveTemp)°C")
-                InfoRow(label: "Setpoint", value: "\(bleManager.liveData.setpoint)°C")
-                InfoRow(label: "Max Temperature", value: "\(bleManager.liveData.maxTemp)°C")
-                InfoRow(label: "Operating Mode", value: bleManager.liveData.mode?.displayName ?? "Unknown")
+
+            Section(String(localized: "section_current_status")) {
+                InfoRow(label: String(localized: "info_temperature"), value: "\(bleManager.liveData.liveTemp)°C")
+                InfoRow(label: String(localized: "info_setpoint"), value: "\(bleManager.liveData.setpoint)°C")
+                InfoRow(label: String(localized: "info_max_temperature"), value: "\(bleManager.liveData.maxTemp)°C")
+                InfoRow(label: String(localized: "info_operating_mode"), value: bleManager.liveData.mode?.displayName ?? String(localized: "common_unknown"))
             }
-            
-            Section("Power") {
-                InfoRow(label: "Voltage", value: String(format: "%.1f V", bleManager.liveData.voltage))
-                InfoRow(label: "Wattage", value: String(format: "%.1f W", bleManager.liveData.watts))
-                InfoRow(label: "Power Level", value: "\(bleManager.liveData.powerPercent)%")
-                InfoRow(label: "Power Source", value: bleManager.liveData.power?.displayName ?? "Unknown")
+
+            Section(String(localized: "section_power")) {
+                InfoRow(label: String(localized: "info_voltage"), value: String(format: "%.1f V", bleManager.liveData.voltage))
+                InfoRow(label: String(localized: "info_wattage"), value: String(format: "%.1f W", bleManager.liveData.watts))
+                InfoRow(label: String(localized: "info_power_level"), value: "\(bleManager.liveData.powerPercent)%")
+                InfoRow(label: String(localized: "info_power_source"), value: bleManager.liveData.power?.displayName ?? String(localized: "common_unknown"))
             }
-            
-            Section("Diagnostics") {
-                InfoRow(label: "Handle Temp", value: String(format: "%.1f°C", bleManager.liveData.handleTempC))
-                InfoRow(label: "Tip Resistance", value: String(format: "%.2f Ω", bleManager.liveData.resistance))
-                InfoRow(label: "Raw Tip", value: "\(bleManager.liveData.rawTip) μV")
-                InfoRow(label: "Hall Sensor", value: "\(bleManager.liveData.hallSensor)")
-                InfoRow(label: "Uptime", value: formatUptime(bleManager.liveData.uptime))
-                InfoRow(label: "Last Movement", value: formatTimeAgo(bleManager.liveData.uptime, lastMovement: bleManager.liveData.lastMovement))
+
+            Section(String(localized: "section_diagnostics")) {
+                InfoRow(label: String(localized: "info_handle_temp"), value: String(format: "%.1f°C", bleManager.liveData.handleTempC))
+                InfoRow(label: String(localized: "info_tip_resistance"), value: String(format: "%.2f Ω", bleManager.liveData.resistance))
+                InfoRow(label: String(localized: "info_raw_tip"), value: "\(bleManager.liveData.rawTip) μV")
+                InfoRow(label: String(localized: "info_hall_sensor"), value: "\(bleManager.liveData.hallSensor)")
+                InfoRow(label: String(localized: "info_uptime"), value: formatUptime(bleManager.liveData.uptime))
+                InfoRow(label: String(localized: "info_last_movement"), value: formatTimeAgo(bleManager.liveData.uptime, lastMovement: bleManager.liveData.lastMovement))
             }
             
             Section {
@@ -414,7 +414,7 @@ struct DiagnosticsView: View {
                 } label: {
                     HStack {
                         Spacer()
-                        Text("Disconnect")
+                        Text(String(localized: "button_disconnect"))
                         Spacer()
                     }
                 }
