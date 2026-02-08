@@ -18,7 +18,7 @@ struct SettingsView: View {
                         Label("Settings", systemImage: "slider.horizontal.3")
                     }
                     .tag(0)
-                
+
                 DiagnosticsView(bleManager: bleManager)
                     .tabItem {
                         Label("Info", systemImage: "info.circle")
@@ -27,6 +27,7 @@ struct SettingsView: View {
             }
             .navigationTitle(selectedTab == 0 ? "Settings" : "Device Info")
             .navigationBarTitleDisplayMode(.inline)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
@@ -277,6 +278,8 @@ struct ConfigurationView: View {
                     }
                 }
                 .disabled(saveInProgress)
+                .accessibilityLabel(saveInProgress ? "Saving settings" : "Save settings to device")
+                .accessibilityHint("Saves all settings to persist across device restarts")
             } footer: {
                 Text("Changes are written immediately but must be saved to persist across restarts.")
             }
@@ -286,6 +289,7 @@ struct ConfigurationView: View {
                 ProgressView("Loading settings...")
                     .padding()
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityLabel("Loading device settings")
             }
         }
         .task {
@@ -414,6 +418,8 @@ struct DiagnosticsView: View {
                         Spacer()
                     }
                 }
+                .accessibilityLabel("Disconnect from device")
+                .accessibilityHint("Closes the Bluetooth connection to your soldering iron")
             }
         }
     }
@@ -472,6 +478,7 @@ struct SettingRow: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
+            .accessibilityHidden(true)
 
             Slider(
                 value: Binding(
@@ -489,7 +496,11 @@ struct SettingRow: View {
                     }
                 }
             )
+            .accessibilityLabel(label)
+            .accessibilityValue("\(value) \(unit)")
+            .accessibilityHint("Adjust using the slider. Range is \(range.lowerBound) to \(range.upperBound) \(unit)")
         }
+        .accessibilityElement(children: .contain)
     }
 
     private func hapticLight() {
@@ -517,6 +528,9 @@ struct ToggleSettingRow: View {
                 onChange(newValue)
             }
         ))
+        .accessibilityLabel(label)
+        .accessibilityValue(value ? "On" : "Off")
+        .accessibilityHint("Double tap to toggle")
     }
 
     private func hapticLight() {
@@ -544,6 +558,9 @@ struct PickerSettingRow: View {
                 Text(option.1).tag(option.0)
             }
         }
+        .accessibilityLabel(label)
+        .accessibilityValue(options.first(where: { $0.0 == value })?.1 ?? "")
+        .accessibilityHint("Select an option from the list")
     }
 
     private func hapticSelection() {
@@ -555,7 +572,7 @@ struct PickerSettingRow: View {
 struct InfoRow: View {
     let label: String
     let value: String
-    
+
     var body: some View {
         HStack {
             Text(label)
@@ -565,5 +582,7 @@ struct InfoRow: View {
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.trailing)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 }

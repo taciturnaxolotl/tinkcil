@@ -31,6 +31,8 @@ struct ContentView: View {
                 )
                 .padding(.horizontal, 20)
                 .padding(.vertical, 120)
+                .accessibilityLabel("Temperature history graph")
+                .accessibilityHint("Visual representation of temperature over time")
             }
 
             // Main content
@@ -41,6 +43,7 @@ struct ContentView: View {
             }
         }
         .background(Color(.systemBackground))
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .onChange(of: bleManager.liveData.setpoint) { _, newValue in
             if !isEditingSlider && newValue > 0 {
                 targetTemp = Double(newValue)
@@ -93,6 +96,8 @@ struct ContentView: View {
                 }
                 .foregroundStyle(.secondary)
                 .padding(.top, 8)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Target temperature \(bleManager.liveData.setpoint) degrees")
             }
 
             Spacer()
@@ -121,14 +126,23 @@ struct ContentView: View {
                         .font(.subheadline.bold())
                         .lineLimit(1)
                         .truncationMode(.tail)
+                        .accessibilityLabel("Device name")
+                        .accessibilityValue(bleManager.deviceName)
+                        .accessibilityAddTraits(.isHeader)
 
                     Spacer(minLength: 8)
 
                     // Stats
                     HStack(spacing: 12) {
                         statItem(value: String(format: "%.1f", bleManager.liveData.watts), unit: "W")
+                            .accessibilityLabel("Power")
+                            .accessibilityValue("\(String(format: "%.1f", bleManager.liveData.watts)) watts")
                         statItem(value: String(format: "%.1f", bleManager.liveData.voltage), unit: "V")
+                            .accessibilityLabel("Voltage")
+                            .accessibilityValue("\(String(format: "%.1f", bleManager.liveData.voltage)) volts")
                         statItem(value: "\(bleManager.liveData.powerPercent)", unit: "%")
+                            .accessibilityLabel("Power level")
+                            .accessibilityValue("\(bleManager.liveData.powerPercent) percent")
                     }
                     .layoutPriority(1)
 
@@ -137,6 +151,8 @@ struct ContentView: View {
                         Image(systemName: mode.icon)
                             .font(.caption)
                             .foregroundStyle(mode.isActive ? .orange : .secondary)
+                            .accessibilityLabel("Operating mode")
+                            .accessibilityValue(mode.displayName)
                     }
                     
                     // Expand chevron
@@ -151,6 +167,9 @@ struct ContentView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(isTopBarExpanded ? "Collapse device details" : "Expand device details")
+            .accessibilityHint("Shows detailed device information and settings")
+            .accessibilityAddTraits(.isButton)
             
             // Expanded info section
             if isTopBarExpanded {
@@ -198,6 +217,8 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 12)
+                    .accessibilityLabel("Settings and device information")
+                    .accessibilityHint("Opens device configuration and diagnostics")
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -224,6 +245,10 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
         }
         .foregroundStyle(colorForTemp(currentTemp, maxTemp: maxTemp))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Current temperature")
+        .accessibilityValue("\(bleManager.liveData.liveTemp) degrees Celsius")
+        .accessibilityHint(isHeating ? "Heating to \(bleManager.liveData.setpoint) degrees" : "")
     }
 
     // MARK: - Slider Panel
@@ -241,6 +266,7 @@ struct ContentView: View {
             }
             .foregroundStyle(colorForTemp(targetTemp, maxTemp: 450))
             .frame(width: 60)
+            .accessibilityHidden(true)
 
             // Slider
             Slider(
@@ -265,11 +291,13 @@ struct ContentView: View {
             )
             .tint(colorForTemp(targetTemp, maxTemp: 450))
             .accessibilityLabel("Target temperature")
-            .accessibilityValue("\(Int(targetTemp)) degrees")
+            .accessibilityValue("\(Int(targetTemp)) degrees Celsius")
+            .accessibilityHint("Adjust the target soldering temperature")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - Helpers
@@ -329,12 +357,14 @@ struct ContentView: View {
         ZStack {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
+                .accessibilityHidden(true)
 
             VStack(spacing: 20) {
                 if bleManager.isScanning || bleManager.connectionState.isConnecting {
                     ProgressView()
                         .scaleEffect(1.2)
                         .padding(.bottom, 4)
+                        .accessibilityLabel(bleManager.connectionState.isConnecting ? "Connecting to device" : "Scanning for device")
 
                     Text(bleManager.connectionState.isConnecting ? "Connecting..." : "Scanning...")
                         .font(.headline)
@@ -347,20 +377,25 @@ struct ContentView: View {
                         .font(.system(size: 36))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 4)
+                        .accessibilityHidden(true)
 
                     Text("No Device Found")
                         .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
 
                     Button("Scan Again") {
                         hapticLight()
                         bleManager.startScanning()
                     }
                     .buttonStyle(.borderedProminent)
+                    .accessibilityLabel("Scan for device")
+                    .accessibilityHint("Searches for nearby soldering iron")
                 }
             }
             .padding(32)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
             .shadow(color: .black.opacity(0.2), radius: 20)
+            .accessibilityElement(children: .contain)
         }
     }
 
