@@ -390,6 +390,15 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
                     .accessibilityLabel("Scan for device")
                     .accessibilityHint("Searches for nearby soldering iron")
+
+                    Button("Try Demo") {
+                        hapticLight()
+                        bleManager.startDemoMode()
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Try demo mode")
+                    .accessibilityHint("Experience the app with simulated soldering iron data")
                 }
             }
             .padding(32)

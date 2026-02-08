@@ -20,6 +20,7 @@ class BLEManager: NSObject {
     var firmwareVersion: String = ""
     var buildID: String = ""
     var deviceSerial: String = ""
+    var isDemoMode = false
 
     // Temperature history for graph (circular buffer)
     var temperatureHistory = CircularBuffer<TemperaturePoint>(capacity: 60)
@@ -43,6 +44,7 @@ class BLEManager: NSObject {
     private var pendingWrites: [CBUUID: UInt16] = [:]
     private var settingReadCompletions: [CBUUID: (UInt16?) -> Void] = [:]
     private var operationTimeouts: [CBUUID: DispatchWorkItem] = [:]
+    private var demoTimer: Timer?
 
     // MARK: - Init
 
@@ -116,6 +118,11 @@ class BLEManager: NSObject {
     }
 
     func disconnect() {
+        if isDemoMode {
+            stopDemoMode()
+            return
+        }
+
         stopPolling()
 
         if let peripheral = connectedPeripheral {
@@ -158,6 +165,14 @@ class BLEManager: NSObject {
     
     @MainActor
     func writeSetting(index: UInt16, value: UInt16) {
+        if isDemoMode {
+            settingsCache.set(value, for: index)
+            if index == 0 {
+                liveData.setpoint = UInt32(value)
+            }
+            return
+        }
+
         guard connectionState == .connected,
               let peripheral = connectedPeripheral else {
             lastError = .notConnected
@@ -206,6 +221,11 @@ class BLEManager: NSObject {
             return
         }
 
+        if isDemoMode {
+            completion(nil)
+            return
+        }
+
         guard connectionState == .connected,
               let peripheral = connectedPeripheral else {
             lastError = .notConnected
@@ -248,6 +268,8 @@ class BLEManager: NSObject {
     
     @MainActor
     func saveSettings() {
+        if isDemoMode { return }
+
         guard connectionState == .connected,
               let peripheral = connectedPeripheral,
               let characteristic = discoveredCharacteristics[IronOSUUIDs.saveSettings] else {
@@ -262,12 +284,127 @@ class BLEManager: NSObject {
     }
 
     func setSlowPolling() {
+        if isDemoMode { return }
         updatePollingInterval(0.2)
     }
 
     func setFastPolling() {
+        if isDemoMode { return }
         guard connectionState == .connected else { return }
         updatePollingInterval(0.1)
+    }
+
+    // MARK: - Demo Mode
+
+    @MainActor
+    func startDemoMode() {
+        isDemoMode = true
+        connectionState = .connected
+
+        deviceName = "Pinecil-DEMO"
+        firmwareVersion = "v2.22"
+        buildID = "v2.22"
+        deviceSerial = "DEMO000000000000"
+
+        liveData.liveTemp = 25
+        liveData.setpoint = 320
+        liveData.dcInput = 200        // 20.0V
+        liveData.handleTemp = 250     // 25.0°C
+        liveData.powerLevel = 0
+        liveData.powerSource = 2      // PD
+        liveData.tipResistance = 620  // 6.20 Ω
+        liveData.uptime = 0
+        liveData.lastMovement = 0
+        liveData.maxTemp = 450
+        liveData.rawTip = 0
+        liveData.hallSensor = 0
+        liveData.operatingMode = 1    // soldering
+        liveData.estimatedWatts = 0
+
+        // Populate settings cache with realistic defaults
+        let defaults: [(UInt16, UInt16)] = [
+            (0, 320),   // Soldering temp
+            (1, 150),   // Sleep temp
+            (2, 1),     // Sleep time (min)
+            (6, 2),     // Orientation (auto)
+            (7, 6),     // Motion sensitivity
+            (11, 10),   // Shutdown time (min)
+            (13, 0),    // Detailed idle screen (off)
+            (14, 0),    // Detailed soldering screen (off)
+            (17, 0),    // Locking mode (off)
+            (22, 420),  // Boost temp
+            (24, 65),   // Power limit (W)
+            (25, 0),    // Reverse buttons (off)
+            (26, 10),   // Long press step
+            (27, 1),    // Short press step
+            (28, 7),    // Hall sensitivity
+            (33, 0),    // Invert display (off)
+            (34, 51),   // Brightness
+        ]
+        for (index, value) in defaults {
+            settingsCache.set(value, for: index)
+        }
+
+        temperatureHistory.clear()
+
+        demoTimer?.invalidate()
+        demoTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.demoTick()
+            }
+        }
+        if let timer = demoTimer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
+    }
+
+    @MainActor
+    private func demoTick() {
+        let current = Int(liveData.liveTemp)
+        let target = Int(liveData.setpoint)
+        let delta = target - current
+        let noise = Int.random(in: -1...1)
+
+        if abs(delta) <= 2 {
+            // At setpoint — hold steady with small fluctuation
+            liveData.liveTemp = UInt32(clamping: target + noise)
+            liveData.estimatedWatts = UInt32.random(in: 20...40) // ~2-4W maintenance
+            liveData.powerLevel = UInt32.random(in: 5...20)
+            liveData.operatingMode = 1 // soldering
+        } else if delta > 0 {
+            // Heating up
+            let step = min(max(delta / 8, 3), 5)
+            liveData.liveTemp = UInt32(clamping: current + step + noise)
+            liveData.estimatedWatts = UInt32(clamping: 500 + Int.random(in: -30...30)) // ~50W
+            liveData.powerLevel = UInt32(clamping: 200 + Int.random(in: -20...20))
+            liveData.operatingMode = 1
+        } else {
+            // Cooling down
+            let step = min(max(-delta / 10, 2), 4)
+            liveData.liveTemp = UInt32(clamping: current - step + noise)
+            liveData.estimatedWatts = 0
+            liveData.powerLevel = 0
+            liveData.operatingMode = 1
+        }
+
+        liveData.uptime += 1
+        liveData.lastMovement = UInt32.random(in: 0...10)
+
+        recordTemperature()
+    }
+
+    private func stopDemoMode() {
+        demoTimer?.invalidate()
+        demoTimer = nil
+        isDemoMode = false
+        liveData = IronOSLiveData()
+        deviceName = ""
+        firmwareVersion = ""
+        buildID = ""
+        deviceSerial = ""
+        temperatureHistory.clear()
+        connectionState = .disconnected
     }
 
     private func updatePollingInterval(_ interval: TimeInterval) {
