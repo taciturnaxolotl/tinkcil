@@ -312,27 +312,38 @@ struct ConfigurationView: View {
     private func loadSettings() async {
         // Load commonly used settings (will use cache if available)
         let settingsToLoad: [UInt16] = [0, 1, 2, 6, 7, 11, 13, 14, 17, 22, 24, 25, 26, 27, 28, 33, 34]
-        
+
         isLoading = true
-        
+
+        // Check if we're still connected before loading
+        guard bleManager.connectionState.isConnected else {
+            isLoading = false
+            return
+        }
+
         await withTaskGroup(of: (Int, UInt16?).self) { group in
             for index in settingsToLoad {
                 group.addTask { @MainActor in
-                    await withCheckedContinuation { (continuation: CheckedContinuation<(Int, UInt16?), Never>) in
+                    // Check connection state before each read
+                    guard bleManager.connectionState.isConnected else {
+                        return (Int(index), nil)
+                    }
+
+                    return await withCheckedContinuation { (continuation: CheckedContinuation<(Int, UInt16?), Never>) in
                         bleManager.readSetting(index: index) { value in
                             continuation.resume(returning: (Int(index), value))
                         }
                     }
                 }
             }
-            
+
             for await (index, value) in group {
                 if let value = value {
                     settings[index] = value
                 }
             }
         }
-        
+
         isLoading = false
     }
 }
