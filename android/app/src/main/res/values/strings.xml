@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tinkcil</string>
+
+    <!-- Connection -->
+    <string name="connection_scanning">Scanning for device</string>
+    <string name="connection_connecting">Connecting to device</string>
+    <string name="connection_looking_for_iron">Looking for soldering iron…</string>
+    <string name="connection_no_device_found">No device found</string>
+    <string name="connection_scan_again">Scan Again</string>
+    <string name="bluetooth_error_title">Bluetooth Error</string>
+    <string name="try_demo">Try Demo</string>
+
+    <!-- Buttons -->
+    <string name="button_ok">OK</string>
+    <string name="button_done">Done</string>
+    <string name="button_disconnect">Disconnect</string>
+    <string name="button_save_to_device">Save to Device</string>
+    <string name="settings_button">Settings</string>
+
+    <!-- Tabs -->
+    <string name="settings_tab">Settings</string>
+    <string name="info_tab">Device Info</string>
+
+    <!-- Sections -->
+    <string name="section_temperature">Temperature</string>
+    <string name="section_timers">Timers</string>
+    <string name="section_power">Power</string>
+    <string name="section_display">Display</string>
+    <string name="section_sensors">Sensors</string>
+    <string name="section_controls">Controls</string>
+    <string name="section_current_status">Current Status</string>
+    <string name="section_diagnostics">Diagnostics</string>
+
+    <!-- Temperature Settings -->
+    <string name="setting_soldering_temp">Soldering Temperature</string>
+    <string name="setting_sleep_temp">Sleep Temperature</string>
+    <string name="setting_boost_temp">Boost Temperature</string>
+
+    <!-- Timer Settings -->
+    <string name="setting_sleep_time">Sleep Time</string>
+    <string name="setting_shutdown_time">Shutdown Time</string>
+
+    <!-- Power Settings -->
+    <string name="setting_power_limit">Power Limit</string>
+
+    <!-- Display Settings -->
+    <string name="setting_orientation">Orientation</string>
+    <string name="option_right">Right</string>
+    <string name="option_left">Left</string>
+    <string name="option_auto">Auto</string>
+    <string name="setting_brightness">Brightness</string>
+    <string name="setting_invert_display">Invert Display</string>
+    <string name="setting_detailed_idle">Detailed Idle Screen</string>
+    <string name="setting_detailed_soldering">Detailed Soldering Screen</string>
+
+    <!-- Sensor Settings -->
+    <string name="setting_motion_sensitivity">Motion Sensitivity</string>
+    <string name="setting_hall_sensitivity">Hall Sensitivity</string>
+
+    <!-- Control Settings -->
+    <string name="setting_locking_mode">Locking Mode</string>
+    <string name="option_off">Off</string>
+    <string name="option_boost_only">Boost Only</string>
+    <string name="option_full">Full</string>
+    <string name="setting_reverse_buttons">Reverse Buttons</string>
+    <string name="setting_short_press_step">Short Press Step</string>
+    <string name="setting_long_press_step">Long Press Step</string>
+
+    <!-- Detail Stats -->
+    <string name="detail_handle">Handle</string>
+    <string name="detail_tip_resistance">Tip Resistance</string>
+    <string name="detail_mode">Mode</string>
+    <string name="detail_power">Power</string>
+    <string name="detail_firmware">Firmware</string>
+
+    <!-- Device Info -->
+    <string name="device_info_title">Device Information</string>
+    <string name="info_device_name">Device Name</string>
+    <string name="info_firmware">Firmware</string>
+    <string name="info_serial_number">Serial Number</string>
+    <string name="info_temperature">Temperature</string>
+    <string name="info_setpoint">Setpoint</string>
+    <string name="info_max_temperature">Max Temperature</string>
+    <string name="info_operating_mode">Operating Mode</string>
+    <string name="info_voltage">Voltage</string>
+    <string name="info_wattage">Wattage</string>
+    <string name="info_power_level">Power Level</string>
+    <string name="info_power_source">Power Source</string>
+    <string name="info_handle_temp">Handle Temperature</string>
+    <string name="info_tip_resistance">Tip Resistance</string>
+    <string name="info_raw_tip">Raw Tip</string>
+    <string name="info_hall_sensor">Hall Sensor</string>
+    <string name="info_uptime">Uptime</string>
+    <string name="info_last_movement">Last Movement</string>
+
+    <!-- Misc -->
+    <string name="common_unknown">Unknown</string>
+    <string name="target_temperature">Target Temperature</string>
+    <string name="settings_footer_message">Settings are written to the device immediately. Tap Save to persist them across reboots.</string>
+</resources>
