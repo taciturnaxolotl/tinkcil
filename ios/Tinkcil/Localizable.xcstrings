@@ -1142,6 +1142,59 @@
         }
       }
     },
+    "bluetooth_off_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviere Bluetooth in den Einstellungen, um dich mit deinem Lötkolben zu verbinden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Bluetooth in Settings to connect to your soldering iron."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa Bluetooth en Ajustes para conectar con tu soldador."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez le Bluetooth dans les Réglages pour vous connecter à votre fer à souder."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "はんだごてに接続するには、設定でBluetoothをオンにしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인두기에 연결하려면 설정에서 Bluetooth를 켜세요."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включите Bluetooth в Настройках для подключения к паяльнику."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在设置中打开蓝牙以连接烙铁。"
+          }
+        }
+      }
+    },
     "connection_scan_again" : {
       "extractionState" : "manual",
       "localizations" : {

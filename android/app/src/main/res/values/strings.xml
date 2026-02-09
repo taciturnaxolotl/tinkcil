@@ -9,6 +9,8 @@
     <string name="connection_no_device_found">No device found</string>
     <string name="connection_scan_again">Scan Again</string>
     <string name="bluetooth_error_title">Bluetooth Error</string>
+    <string name="bluetooth_off_title">Bluetooth is Off</string>
+    <string name="bluetooth_off_message">Turn on Bluetooth in Settings to connect to your soldering iron.</string>
     <string name="try_demo">Try Demo</string>
 
     <!-- Buttons -->

@@ -397,7 +397,35 @@ struct ContentView: View {
                 .accessibilityHidden(true)
 
             VStack(spacing: 20) {
-                if bleManager.isScanning || bleManager.connectionState.isConnecting {
+                if case .error(let message) = bleManager.connectionState {
+                    Image(systemName: "bluetooth.slash")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 4)
+                        .accessibilityHidden(true)
+
+                    Text(message)
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+
+                    Text(String(localized: "bluetooth_off_message"))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    Button(String(localized: "connection_scan_again")) {
+                        Haptics.light()
+                        bleManager.startScanning()
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button("Try Demo") {
+                        Haptics.light()
+                        bleManager.startDemoMode()
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                } else if bleManager.isScanning || bleManager.connectionState.isConnecting {
                     ProgressView()
                         .scaleEffect(1.2)
                         .padding(.bottom, 4)

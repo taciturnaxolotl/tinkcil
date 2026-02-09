@@ -40,7 +40,7 @@ import javax.inject.Singleton
 import kotlin.coroutines.resume
 
 enum class ConnectionState {
-    DISCONNECTED, SCANNING, CONNECTING, CONNECTED
+    DISCONNECTED, BLUETOOTH_OFF, SCANNING, CONNECTING, CONNECTED
 }
 
 @Singleton
@@ -161,8 +161,13 @@ class BLEManager @Inject constructor(
     fun startScan() {
         if (_connectionState.value == ConnectionState.SCANNING || _connectionState.value == ConnectionState.CONNECTED) return
 
-        val scanner = bluetoothAdapter?.bluetoothLeScanner ?: run {
-            _lastError.value = BLEError.PermissionDenied
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+            _connectionState.value = ConnectionState.BLUETOOTH_OFF
+            return
+        }
+
+        val scanner = bluetoothAdapter.bluetoothLeScanner ?: run {
+            _connectionState.value = ConnectionState.BLUETOOTH_OFF
             return
         }
 
