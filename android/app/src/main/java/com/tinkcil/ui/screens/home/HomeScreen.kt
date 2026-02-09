@@ -71,6 +71,8 @@ fun HomeScreen(
             } else {
                 ScanningOverlay(
                     connectionState = uiState.connectionState,
+                    discoveredDevices = uiState.discoveredDevices,
+                    onDeviceSelected = viewModel::connectToDevice,
                     onScanAgain = viewModel::startScan,
                     onTryDemo = viewModel::startDemo
                 )

@@ -10,8 +10,10 @@ import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.os.ParcelUuid
 import android.content.Context
 import com.tinkcil.data.model.CircularBuffer
 import com.tinkcil.data.model.IronOSLiveData
@@ -42,6 +44,11 @@ import kotlin.coroutines.resume
 enum class ConnectionState {
     DISCONNECTED, BLUETOOTH_OFF, SCANNING, CONNECTING, CONNECTED
 }
+
+data class DiscoveredDevice(
+    val device: BluetoothDevice,
+    val name: String
+)
 
 @Singleton
 class BLEManager @Inject constructor(
@@ -82,6 +89,9 @@ class BLEManager @Inject constructor(
 
     private val _serialNumber = MutableStateFlow<String?>(null)
     val serialNumber: StateFlow<String?> = _serialNumber.asStateFlow()
+
+    private val _discoveredDevices = MutableStateFlow<List<DiscoveredDevice>>(emptyList())
+    val discoveredDevices: StateFlow<List<DiscoveredDevice>> = _discoveredDevices.asStateFlow()
 
     private val _lastError = MutableStateFlow<BLEError?>(null)
     val lastError: StateFlow<BLEError?> = _lastError.asStateFlow()
@@ -172,6 +182,11 @@ class BLEManager @Inject constructor(
         }
 
         _connectionState.value = ConnectionState.SCANNING
+        _discoveredDevices.value = emptyList()
+
+        val scanFilter = ScanFilter.Builder()
+            .setServiceUuid(ParcelUuid(IronOSUUIDs.BULK_DATA_SERVICE))
+            .build()
 
         val scanSettings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -179,11 +194,11 @@ class BLEManager @Inject constructor(
 
         val scanCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                val name = result.device.name ?: return
-                if (name.startsWith("Pinecil-") || name.startsWith("PrattlePin-")) {
-                    scanner.stopScan(this)
-                    scanTimeoutJob?.cancel()
-                    scope.launch { connectToDevice(result.device, name) }
+                val name = result.device.name ?: "Unknown Iron"
+                val address = result.device.address
+                val current = _discoveredDevices.value
+                if (current.none { it.device.address == address }) {
+                    _discoveredDevices.value = current + DiscoveredDevice(result.device, name)
                 }
             }
 
@@ -193,7 +208,7 @@ class BLEManager @Inject constructor(
             }
         }
 
-        scanner.startScan(null, scanSettings, scanCallback)
+        scanner.startScan(listOf(scanFilter), scanSettings, scanCallback)
 
         scanTimeoutJob = scope.launch {
             delay(10_000)
@@ -201,13 +216,18 @@ class BLEManager @Inject constructor(
                 scanner.stopScan(scanCallback)
             } catch (_: Exception) {}
             if (_connectionState.value == ConnectionState.SCANNING) {
-                _connectionState.value = ConnectionState.DISCONNECTED
+                val devices = _discoveredDevices.value
+                if (devices.size == 1) {
+                    connectToDevice(devices[0].device, devices[0].name)
+                } else {
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                }
             }
         }
     }
 
     @SuppressLint("MissingPermission")
-    private suspend fun connectToDevice(device: BluetoothDevice, name: String) {
+    suspend fun connectToDevice(device: BluetoothDevice, name: String) {
         _connectionState.value = ConnectionState.CONNECTING
         _deviceName.value = name
 

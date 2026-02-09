@@ -105,7 +105,11 @@ class BLEManager: NSObject {
         centralManager.stopScan()
         isScanning = false
         if connectionState == .scanning {
-            connectionState = .disconnected
+            if discoveredDevices.count == 1 {
+                connect(to: discoveredDevices[0])
+            } else {
+                connectionState = .disconnected
+            }
         }
     }
 
@@ -572,17 +576,6 @@ extension BLEManager: CBCentralManagerDelegate {
                         rssi RSSI: NSNumber) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            // Auto-connect to first discovered Tinkcil
-            if self.connectedPeripheral == nil {
-                // Match either Pinecil-* (legacy) or by the advertised service UUID
-                if peripheral.name?.hasPrefix("Pinecil-") == true ||
-                   peripheral.name?.hasPrefix("PrattlePin-") == true ||
-                   (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID])?.contains(IronOSUUIDs.bulkDataService) == true {
-                    self.connect(to: peripheral)
-                    return
-                }
-            }
-
             if !self.discoveredDevices.contains(where: { $0.identifier == peripheral.identifier }) {
                 self.discoveredDevices.append(peripheral)
             }
@@ -593,7 +586,7 @@ extension BLEManager: CBCentralManagerDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.connectionState = .connected
-            self.deviceName = peripheral.name ?? "Tinkcil"
+            self.deviceName = peripheral.name ?? "Unknown Iron"
         }
         peripheral.discoverServices(nil)
     }

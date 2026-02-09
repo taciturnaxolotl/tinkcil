@@ -8,6 +8,7 @@
     <string name="connection_looking_for_iron">Looking for soldering iron…</string>
     <string name="connection_no_device_found">No device found</string>
     <string name="connection_scan_again">Scan Again</string>
+    <string name="connection_multiple_devices">Multiple devices found</string>
     <string name="bluetooth_error_title">Bluetooth Error</string>
     <string name="bluetooth_off_title">Bluetooth is Off</string>
     <string name="bluetooth_off_message">Turn on Bluetooth in Settings to connect to your soldering iron.</string>

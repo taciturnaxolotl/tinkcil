@@ -437,6 +437,37 @@ struct ContentView: View {
                     Text(String(localized: "connection_looking_for_iron"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                } else if bleManager.discoveredDevices.count > 1 {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 4)
+                        .accessibilityHidden(true)
+
+                    Text(String(localized: "connection_multiple_devices"))
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+
+                    VStack(spacing: 8) {
+                        ForEach(bleManager.discoveredDevices, id: \.identifier) { peripheral in
+                            Button {
+                                Haptics.light()
+                                bleManager.connect(to: peripheral)
+                            } label: {
+                                Text(peripheral.name ?? String(localized: "common_unknown"))
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+
+                    Button(String(localized: "connection_scan_again")) {
+                        Haptics.light()
+                        bleManager.startScanning()
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
                 } else {
                     Image(systemName: "antenna.radiowaves.left.and.right.slash")
                         .font(.system(size: 36))

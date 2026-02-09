@@ -3,6 +3,7 @@ package com.tinkcil.ui.screens.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tinkcil.data.ble.BLEManager
+import com.tinkcil.data.ble.DiscoveredDevice
 import com.tinkcil.data.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,9 +59,12 @@ class HomeViewModel @Inject constructor(
                     settingsCache = settings,
                     lastError = error,
                     temperatureHistory = bleManager.temperatureHistory.toList(),
+                    discoveredDevices = bleManager.discoveredDevices.value,
                     isTopBarExpanded = _uiState.value.isTopBarExpanded,
                     isSettingsSheetVisible = _uiState.value.isSettingsSheetVisible
                 )
+            }.combine(bleManager.discoveredDevices) { state, devices ->
+                state.copy(discoveredDevices = devices)
             }.collect { state ->
                 _uiState.value = state
                 if (state.settingsCache.isNotEmpty()) {
@@ -81,6 +85,12 @@ class HomeViewModel @Inject constructor(
 
     fun startScan() {
         bleManager.startScan()
+    }
+
+    fun connectToDevice(device: DiscoveredDevice) {
+        viewModelScope.launch {
+            bleManager.connectToDevice(device.device, device.name)
+        }
     }
 
     fun startDemo() {

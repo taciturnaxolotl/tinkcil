@@ -22,10 +22,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tinkcil.R
 import com.tinkcil.data.ble.ConnectionState
+import com.tinkcil.data.ble.DiscoveredDevice
 
 @Composable
 fun ScanningOverlay(
     connectionState: ConnectionState,
+    discoveredDevices: List<DiscoveredDevice>,
+    onDeviceSelected: (DiscoveredDevice) -> Unit,
     onScanAgain: () -> Unit,
     onTryDemo: () -> Unit,
     modifier: Modifier = Modifier
@@ -93,19 +96,42 @@ fun ScanningOverlay(
                 }
             }
             ConnectionState.DISCONNECTED -> {
-                Text(
-                    text = stringResource(R.string.connection_no_device_found),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(onClick = onScanAgain) {
-                    Text(stringResource(R.string.connection_scan_again))
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(onClick = onTryDemo) {
-                    Text(stringResource(R.string.try_demo))
+                if (discoveredDevices.size > 1) {
+                    Text(
+                        text = stringResource(R.string.connection_multiple_devices),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    discoveredDevices.forEach { device ->
+                        Button(
+                            onClick = { onDeviceSelected(device) },
+                            modifier = Modifier.fillMaxWidth(0.7f)
+                        ) {
+                            Text(device.name)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(onClick = onScanAgain) {
+                        Text(stringResource(R.string.connection_scan_again))
+                    }
+                } else {
+                    Text(
+                        text = stringResource(R.string.connection_no_device_found),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(onClick = onScanAgain) {
+                        Text(stringResource(R.string.connection_scan_again))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(onClick = onTryDemo) {
+                        Text(stringResource(R.string.try_demo))
+                    }
                 }
             }
             else -> {}
