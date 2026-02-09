@@ -3,6 +3,7 @@
 //  Tinkcil
 //
 
+import CoreBluetooth
 import SwiftUI
 
 struct ContentView: View {

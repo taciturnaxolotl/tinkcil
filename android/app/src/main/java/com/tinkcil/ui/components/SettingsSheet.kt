@@ -15,6 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -29,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.tinkcil.R
 import com.tinkcil.data.model.IronOSLiveData
@@ -214,6 +216,10 @@ private fun SettingSlider(
             onValueChange = { sliderValue = it },
             onValueChangeFinished = { onSettingChanged(index, sliderValue.roundToInt()) },
             valueRange = min.toFloat()..max.toFloat(),
+            colors = SliderDefaults.colors(
+                activeTickColor = Color.Transparent,
+                inactiveTickColor = Color.Transparent
+            ),
             modifier = Modifier.fillMaxWidth()
         )
     }

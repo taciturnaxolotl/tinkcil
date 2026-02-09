@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.tinkcil.R
 import kotlin.math.roundToInt
@@ -75,10 +76,11 @@ fun SliderPanel(
                     onSliderEnd()
                 },
                 valueRange = 10f..450f,
-                steps = 87, // (450-10)/5 - 1 = 87 steps
                 colors = SliderDefaults.colors(
                     thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
